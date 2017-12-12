@@ -108,15 +108,31 @@ T_Psat = T_Psat[T_Psat>T_min]
 Psat_data = Psat_data[T_Psat<T_max]
 T_Psat = T_Psat[T_Psat<T_max]
 
-# Set precision in data (1/SD**2)
-rhol_t = 0.3  
-deltaHv_t = 1.
-Psat_t = 0.1
+# Set percent uncertainty in each property
+# These values are to represent the simulation uncertainty more than the experimental uncertainty
+# Also, the transiton matrix for eps and sig for each model are tuned to this rhol uncertainty.
+# I.e. the optimal "lit" values agree well with a 3% uncertainty in rhol. This improved the RJMC model swap acceptance.
+pu_rhol = 3
+pu_Psat = 5
+   
+# Calculate the absolute uncertainty
+u_rhol = rhol_data*pu_rhol/100.
+u_Psat = Psat_data*pu_Psat/100.
+   
+# Calculate the estimated standard deviation
+sd_rhol = u_rhol/2.
+sd_Psat = u_Psat/2.
+
+# Calculate the precision in each property
+t_rhol = np.sqrt(1./sd_rhol)
+t_Psat = np.sqrt(1./sd_Psat)                                   
 
 # Initial values for the Markov Chain
 guess_0 = (0,eps_lit_LJ, sig_lit_LJ) # Can use critical constants
 guess_1 = (1,eps_lit_UA,sig_lit_UA)
 guess_2 = (2,eps_lit_AUA,sig_lit_AUA)
+
+# These transition matrices are designed for when rhol is the only target property
 
 Tmatrix_eps = np.ones([3,3])
 Tmatrix_eps[0,1] = eps_lit_UA/eps_lit_LJ
@@ -147,6 +163,8 @@ duni = distributions.uniform.logpdf
 rnorm = np.random.normal
 runif = np.random.rand
 
+properties = 'rhol'
+
 def calc_posterior(model,eps, sig):
 
     logp = 0
@@ -160,9 +178,13 @@ def calc_posterior(model,eps, sig):
     Psat_hat = Psat_hat_models(T_Psat,model,eps,sig) #[kPa]        
  
     # Data likelihood
-    #logp += sum(dnorm(RP_deltaHv, deltaHv_hat, deltaHv_t**-2.))
-    logp += sum(dnorm(rhol_data,rhol_hat,rhol_t**-2.))
-    #logp += sum(dnorm(Psat_data,Psat_hat,rhol_t**-2.))
+    if properties == 'rhol':
+        logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
+    elif properties == 'Psat':
+        logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
+    elif properties == 'Multi':
+        logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
+        logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
     return logp
 
 def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var, 
@@ -274,8 +296,8 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
     return trace, trace[tune_for:], logp_trace, logp_trace[tune_for:],accept_prod, model_swaps
 
 # Set the number of iterations to run RJMC and how long to tune for
-n_iter = 20000
-tune_for = 10000
+n_iter = 20000 # 20000 appears to be sufficient
+tune_for = 10000 #10000 appears to be sufficient
 trace_all,trace_tuned,logp_all,logp_tuned, acc_tuned, model_swaps = RJMC_tuned(calc_posterior, n_iter, guess_0, prop_var=guess_var, tune_for=tune_for)
 
 model_params = trace_all[tune_for+1:,0]
