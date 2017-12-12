@@ -244,7 +244,7 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
                 
                 # Accept
                 trace[i+1] = params
-                logp_all[i+1] = proposed_log_prob.copy()
+                logp_trace[i+1] = proposed_log_prob.copy()
                 current_log_prob = proposed_log_prob.copy()
                 current_params = params
                 accepted[j] += 1
@@ -324,7 +324,7 @@ f = plt.figure()
 plt.scatter(trace_all[:,2],trace_all[:,1],label='Trajectory')
 plt.scatter(trace_tuned[:,2],trace_tuned[:,1],label='Production')
 #plt.scatter(sig_lit,eps_lit,label='Literature')
-plt.scatter(sig_rhoc,eps_Tc,label='Critical Point')
+#plt.scatter(sig_rhoc,eps_Tc,label='Critical Point')
 plt.scatter(guess_0[2],guess_0[1],label='Guess LJ')
 plt.scatter(guess_1[2],guess_1[1],label='Guess 2CLJ UA')
 plt.scatter(guess_2[2],guess_2[1],label='Guess 2CLJ AUA')
