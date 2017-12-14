@@ -16,6 +16,7 @@ import yaml
 from LennardJones_correlations import LennardJones
 from LennardJones_2Center_correlations import LennardJones_2C
 from scipy.stats import distributions
+from scipy.optimize import minimize
 
 # Here we have chosen argon as the test case
 compound="ethane"
@@ -86,11 +87,11 @@ T_deltaHv = data[:,0] #[K]
 RP_deltaHv = data[:,1] #[kJ/mol]
 
 data = np.loadtxt('TRC_data_rhoL.txt')
-T_rhol = data[:,0] #[K]
+T_rhol_data = data[:,0] #[K]
 rhol_data = data[:,1] #[kJ/mol]
 
 data = np.loadtxt('TRC_data_Pv.txt')
-T_Psat = data[:,0] #[K]
+T_Psat_data = data[:,0] #[K]
 Psat_data = data[:,1] #[kJ/mol]
 
 # Limit temperature range to that which is typical of ITIC MD simulations
@@ -98,15 +99,15 @@ Psat_data = data[:,1] #[kJ/mol]
 T_min = 137
 T_max = 260
 
-rhol_data = rhol_data[T_rhol>T_min]
-T_rhol = T_rhol[T_rhol>T_min]
-rhol_data = rhol_data[T_rhol<T_max]
-T_rhol = T_rhol[T_rhol<T_max]
+rhol_data = rhol_data[T_rhol_data>T_min]
+T_rhol_data = T_rhol_data[T_rhol_data>T_min]
+rhol_data = rhol_data[T_rhol_data<T_max]
+T_rhol_data = T_rhol_data[T_rhol_data<T_max]
 
-Psat_data = Psat_data[T_Psat>T_min]
-T_Psat = T_Psat[T_Psat>T_min]
-Psat_data = Psat_data[T_Psat<T_max]
-T_Psat = T_Psat[T_Psat<T_max]
+Psat_data = Psat_data[T_Psat_data>T_min]
+T_Psat_data = T_Psat_data[T_Psat_data>T_min]
+Psat_data = Psat_data[T_Psat_data<T_max]
+T_Psat_data = T_Psat_data[T_Psat_data<T_max]
 
 # Set percent uncertainty in each property
 # These values are to represent the simulation uncertainty more than the experimental uncertainty
@@ -114,7 +115,22 @@ T_Psat = T_Psat[T_Psat<T_max]
 # I.e. the optimal "lit" values agree well with a 3% uncertainty in rhol. This improved the RJMC model swap acceptance.
 pu_rhol = 3
 pu_Psat = 5
-   
+
+# I decided to include the same error model I am using for Mie lambda-6
+# For pu_rhol_low = 0.3 and pu_rhol_high = 0.5 AUA is 100%
+# For pu_rhol_low = 1 and pu_rhol_high = 3 LJ 16%, UA 22%, AUA 62%
+#pu_rhol_low = 1
+#T_rhol_switch = 230
+#pu_rhol_high = 3
+#
+#pu_Psat_low = 5
+#T_Psat_switch = 180
+#pu_Psat_high = 3
+#
+## Piecewise function to represent the uncertainty in rhol and Psat
+#pu_rhol = np.piecewise(T_rhol_data,[T_rhol_data<T_rhol_switch,T_rhol_data>=T_rhol_switch],[pu_rhol_low,lambda x:np.poly1d(np.polyfit([T_rhol_switch,T_max],[pu_rhol_low,pu_rhol_high],1))(x)])
+#pu_Psat = np.piecewise(T_Psat_data,[T_Psat_data<T_Psat_switch,T_Psat_data>=T_Psat_switch],[lambda x:np.poly1d(np.polyfit([T_min,T_Psat_switch],[pu_Psat_low,pu_Psat_high],1))(x),pu_Psat_high])
+  
 # Calculate the absolute uncertainty
 u_rhol = rhol_data*pu_rhol/100.
 u_Psat = Psat_data*pu_Psat/100.
@@ -132,23 +148,23 @@ guess_0 = (0,eps_lit_LJ, sig_lit_LJ) # Can use critical constants
 guess_1 = (1,eps_lit_UA,sig_lit_UA)
 guess_2 = (2,eps_lit_AUA,sig_lit_AUA)
 
-# These transition matrices are designed for when rhol is the only target property
-
-Tmatrix_eps = np.ones([3,3])
-Tmatrix_eps[0,1] = eps_lit_UA/eps_lit_LJ
-Tmatrix_eps[0,2] = eps_lit_AUA/eps_lit_LJ
-Tmatrix_eps[1,0] = eps_lit_LJ/eps_lit_UA
-Tmatrix_eps[1,2] = eps_lit_AUA/eps_lit_UA
-Tmatrix_eps[2,0] = eps_lit_LJ/eps_lit_AUA
-Tmatrix_eps[2,1] = eps_lit_UA/eps_lit_AUA
-           
-Tmatrix_sig = np.ones([3,3])
-Tmatrix_sig[0,1] = sig_lit_UA/sig_lit_LJ
-Tmatrix_sig[0,2] = sig_lit_AUA/sig_lit_LJ
-Tmatrix_sig[1,0] = sig_lit_LJ/sig_lit_UA
-Tmatrix_sig[1,2] = sig_lit_AUA/sig_lit_UA
-Tmatrix_sig[2,0] = sig_lit_LJ/sig_lit_AUA
-Tmatrix_sig[2,1] = sig_lit_UA/sig_lit_AUA           
+## These transition matrices are designed for when rhol is the only target property
+#
+#Tmatrix_eps = np.ones([3,3])
+#Tmatrix_eps[0,1] = eps_lit_UA/eps_lit_LJ
+#Tmatrix_eps[0,2] = eps_lit_AUA/eps_lit_LJ
+#Tmatrix_eps[1,0] = eps_lit_LJ/eps_lit_UA
+#Tmatrix_eps[1,2] = eps_lit_AUA/eps_lit_UA
+#Tmatrix_eps[2,0] = eps_lit_LJ/eps_lit_AUA
+#Tmatrix_eps[2,1] = eps_lit_UA/eps_lit_AUA
+#           
+#Tmatrix_sig = np.ones([3,3])
+#Tmatrix_sig[0,1] = sig_lit_UA/sig_lit_LJ
+#Tmatrix_sig[0,2] = sig_lit_AUA/sig_lit_LJ
+#Tmatrix_sig[1,0] = sig_lit_LJ/sig_lit_UA
+#Tmatrix_sig[1,2] = sig_lit_AUA/sig_lit_UA
+#Tmatrix_sig[2,0] = sig_lit_LJ/sig_lit_AUA
+#Tmatrix_sig[2,1] = sig_lit_UA/sig_lit_AUA           
            
 # Initial estimates for standard deviation used in proposed distributions of MCMC
 guess_var = [1,20, 0.05]
@@ -168,14 +184,14 @@ properties = 'rhol'
 def calc_posterior(model,eps, sig):
 
     logp = 0
-    
+#    print(eps,sig)
     # Using noninformative priors
     logp += duni(sig, 0, 1)
     logp += duni(eps, 0,1000) 
     
 #    print(eps,sig)
-    rhol_hat = rhol_hat_models(T_rhol,model,eps,sig) #[kg/m3]
-    Psat_hat = Psat_hat_models(T_Psat,model,eps,sig) #[kPa]        
+    rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig) #[kg/m3]
+    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig) #[kPa]        
  
     # Data likelihood
     if properties == 'rhol':
@@ -186,6 +202,60 @@ def calc_posterior(model,eps, sig):
         logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
         logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
     return logp
+
+def gen_Tmatrix():
+    ''' Generate Transition matrices based on the optimal eps, sig for different models'''
+    
+    obj_LJ = lambda eps_sig: -calc_posterior(0,eps_sig[0],eps_sig[1])
+    obj_UA = lambda eps_sig: -calc_posterior(1,eps_sig[0],eps_sig[1])
+    obj_AUA = lambda eps_sig: -calc_posterior(2,eps_sig[0],eps_sig[1])
+    
+    guess_LJ = [guess_0[1],guess_0[2]]
+    guess_UA = [guess_1[1],guess_1[2]]
+    guess_AUA = [guess_2[1],guess_2[2]]
+    
+    # Make sure bounds are in a reasonable range so that models behave properly
+    bnd_LJ = ((0.95*guess_0[1],guess_0[1]*1.05),(0.99*guess_0[2],guess_0[2]*1.01))
+    bnd_UA = ((0.95*guess_1[1],guess_1[1]*1.05),(0.99*guess_1[2],guess_1[2]*1.01))
+    bnd_AUA = ((0.95*guess_2[1],guess_2[1]*1.05),(0.99*guess_2[2],guess_2[2]*1.01))
+    
+    #Help debug
+#    print(bnd_LJ)
+#    print(bnd_UA)
+#    print(bnd_AUA)
+    
+    opt_LJ = minimize(obj_LJ,guess_LJ,bounds=bnd_LJ)
+    opt_UA = minimize(obj_UA,guess_UA,bounds=bnd_UA)
+    opt_AUA = minimize(obj_AUA,guess_AUA,bounds=bnd_AUA)
+    
+    #Help debug
+#    print(opt_LJ)
+#    print(opt_UA)
+#    print(opt_AUA)
+        
+    eps_opt_LJ, sig_opt_LJ = opt_LJ.x[0], opt_LJ.x[1]
+    eps_opt_UA, sig_opt_UA = opt_UA.x[0], opt_UA.x[1]
+    eps_opt_AUA, sig_opt_AUA = opt_AUA.x[0], opt_AUA.x[1]
+
+    Tmatrix_eps = np.ones([3,3])
+    Tmatrix_eps[0,1] = eps_opt_UA/eps_opt_LJ
+    Tmatrix_eps[0,2] = eps_opt_AUA/eps_opt_LJ
+    Tmatrix_eps[1,0] = eps_opt_LJ/eps_opt_UA
+    Tmatrix_eps[1,2] = eps_opt_AUA/eps_opt_UA
+    Tmatrix_eps[2,0] = eps_opt_LJ/eps_opt_AUA
+    Tmatrix_eps[2,1] = eps_opt_UA/eps_opt_AUA
+               
+    Tmatrix_sig = np.ones([3,3])
+    Tmatrix_sig[0,1] = sig_opt_UA/sig_opt_LJ
+    Tmatrix_sig[0,2] = sig_opt_AUA/sig_opt_LJ
+    Tmatrix_sig[1,0] = sig_opt_LJ/sig_opt_UA
+    Tmatrix_sig[1,2] = sig_opt_AUA/sig_opt_UA
+    Tmatrix_sig[2,0] = sig_opt_LJ/sig_opt_AUA
+    Tmatrix_sig[2,1] = sig_opt_UA/sig_opt_AUA 
+               
+    return Tmatrix_eps, Tmatrix_sig
+
+Tmatrix_eps, Tmatrix_sig = gen_Tmatrix()
 
 def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var, 
                      tune_for=None, tune_interval=100):
@@ -357,8 +427,8 @@ plt.legend()
 f.savefig(compound+"_Trajectory_RJMC.pdf")  
 
 T_plot_deltaHv = np.linspace(T_deltaHv.min(), T_deltaHv.max())
-T_plot_rhol = np.linspace(T_rhol.min(), T_rhol.max())
-T_plot_Psat = np.linspace(T_Psat.min(), T_Psat.max())
+T_plot_rhol = np.linspace(T_rhol_data.min(), T_rhol_data.max())
+T_plot_Psat = np.linspace(T_Psat_data.min(), T_Psat_data.max())
    
 # Plot the predicted properties versus REFPROP. Include the Bayesian uncertainty by sampling a subset of 100 eps/sig.
 f, axarr = plt.subplots(2,2,figsize=(10,10))
@@ -380,9 +450,9 @@ for i in range(100): #Plot 100 random samples from production
     axarr[1,0].plot(T_plot_Psat,np.log10(Psat_sample),color_scheme[model_sample],alpha=0.5)
     axarr[0,1].plot(1000./T_plot_Psat,np.log10(Psat_sample),color_scheme[model_sample],alpha=0.5) 
 
-axarr[0,0].plot(T_rhol,rhol_data,'ko',mfc='None',label='TRC')
-axarr[1,0].plot(T_Psat,np.log10(Psat_data),'ko',mfc='None',label='TRC')
-axarr[0,1].plot(1000./T_Psat,np.log10(Psat_data),'ko',mfc='None',label='TRC')
+axarr[0,0].plot(T_rhol_data,rhol_data,'ko',mfc='None',label='TRC')
+axarr[1,0].plot(T_Psat_data,np.log10(Psat_data),'ko',mfc='None',label='TRC')
+axarr[0,1].plot(1000./T_Psat_data,np.log10(Psat_data),'ko',mfc='None',label='TRC')
 axarr[1,1].plot(T_deltaHv,RP_deltaHv,'k--',label='REFPROP')
 
 for axrow in axarr:
