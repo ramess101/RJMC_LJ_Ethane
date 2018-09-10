@@ -16,9 +16,11 @@ import yaml
 from LennardJones_correlations import LennardJones
 from LennardJones_2Center_correlations import LennardJones_2C
 from scipy.stats import distributions
+from scipy.stats import linregress
 from scipy.optimize import minimize
+import random as rm
 
-# Here we have chosen argon as the test case
+# Here we have chosen ethane as the test case
 compound="ethane"
 fname = compound+".yaml"
 
@@ -38,6 +40,8 @@ Lbond_lit_AUA = yfile["force_field_params"]["Lbond_lit_AUA"] #[nm]
 Tc_RP = yfile["physical_constants"]["T_c"] #[K]
 rhoc_RP = yfile["physical_constants"]["rho_c"] #[kg/m3]
 M_w = yfile["physical_constants"]["M_w"] #[gm/mol]
+
+#%%
 
 # Substantiate LennardJones class
 Ethane_LJ = LennardJones(M_w)
@@ -171,6 +175,36 @@ guess_var = [1,20, 0.05]
 # Variance (or standard deviation, need to verify which one it is) in priors for epsilon and sigma
 #prior_var = [5,0.001]
 
+
+#OCM: All of this first section is Rich's data setup, which I don't have any reason to alter.  I am focusing more on the monte carlo implementation
+#%%
+T_lin=np.linspace(T_min,T_max,num=200)
+
+rhol_fake_data_model0=rhol_hat_models(T_rhol_data,0,eps_lit_LJ+0.01*eps_lit_LJ, sig_lit_LJ+0.01*sig_lit_LJ)
+rhol_fake_data_model1=rhol_hat_models(T_rhol_data,1,eps_lit_UA-0.01*eps_lit_UA,sig_lit_UA-0.01*sig_lit_UA)
+rhol_fake_data_model2=rhol_hat_models(T_rhol_data,2,eps_lit_AUA,sig_lit_AUA)
+#plt.plot(T_rhol_data,rhol_fake_data_model0)
+#plt.plot(T_rhol_data,rhol_fake_data_model1)
+#plt.plot(T_rhol_data,rhol_fake_data_model2)
+rhol_fake_data_mix=np.empty(np.size(T_rhol_data))
+num0=0
+num1=0
+for i in range(np.size(T_rhol_data)):
+    randi=np.random.random()
+    if randi <= 0.1:
+        rhol_fake_data_mix[i]=rhol_fake_data_model0[i]
+        num0+=1
+    elif 0.1 < randi <= 0.9:
+        rhol_fake_data_mix[i]=rhol_fake_data_model1[i]
+        num1+=1
+    else:
+        rhol_fake_data_mix[i]=rhol_fake_data_model2[i]
+print(num0)
+print(num1)
+
+#OCM: This was me attempting to create a fake dataset so that I could reliably reproduce sampling with the ratios of data that I made
+#The sampler needs to be working properly in order for this to work, however.  Which is most likely not true at this point.
+#%%
 # Simplify notation
 dnorm = distributions.norm.logpdf
 dgamma = distributions.gamma.logpdf
@@ -188,6 +222,8 @@ def calc_posterior(model,eps, sig):
     # Using noninformative priors
     logp += duni(sig, 0, 1)
     logp += duni(eps, 0,1000) 
+    # OCM: no reason to use anything but uniform priors at this point.  Could probably narrow the prior ranges a little bit to improve acceptance,
+    #But Rich is rightly being conservative here especially since evaluations are cheap.
     
 #    print(eps,sig)
     rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig) #[kg/m3]
@@ -202,6 +238,9 @@ def calc_posterior(model,eps, sig):
         logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
         logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
     return logp
+    #return rhol_hat
+    
+    #OCM: Standard calculation of the log posterior. Note that t_rhol and t_Psat are precisions
 
 def gen_Tmatrix():
     ''' Generate Transition matrices based on the optimal eps, sig for different models'''
@@ -236,6 +275,12 @@ def gen_Tmatrix():
     eps_opt_LJ, sig_opt_LJ = opt_LJ.x[0], opt_LJ.x[1]
     eps_opt_UA, sig_opt_UA = opt_UA.x[0], opt_UA.x[1]
     eps_opt_AUA, sig_opt_AUA = opt_AUA.x[0], opt_AUA.x[1]
+    
+    #OCM: Important distinction:  This is not the transition matrix in the tradition RJMC sense of the term, which may be confusing.
+    #This is a method of altering the proposal distribution q(eps,sig) to produce a move that is more likely to be accepted
+    #This RJMC problem of disjoint high probability regions will likely be exacerbated with a high dimensional and variable model space.
+    #Will probably require a more sophisticated solution like AIS-RJMC (https://www.tandfonline.com/doi/abs/10.1080/10618600.2013.805651)
+    #But I expect that the approach here will work for relatively simple problems such as this one
 
     Tmatrix_eps = np.ones([3,3])
     Tmatrix_eps[0,1] = eps_opt_UA/eps_opt_LJ
@@ -257,8 +302,10 @@ def gen_Tmatrix():
 
 Tmatrix_eps, Tmatrix_sig = gen_Tmatrix()
 
+#OCM: With more difficult distributions it might be important to update this distribution as we go along, if it is still viable.
+
 def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var, 
-                     tune_for=None, tune_interval=100):
+                     tune_for=None, tune_interval=1):
     
     n_params = len(initial_values) #One column is the model number
             
@@ -279,10 +326,13 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
     model_swap_attempts = 0
     swap_freq = 1
     
+    # OCM: Currently attempting a model swap every single move, although this can be easily changed.  This is something that is not of critical importance now but will be important in the future.
+    
     # Calculate joint posterior for initial values
     current_log_prob = calc_posterior(*trace[0])
     
     logp_trace[0] = current_log_prob
+    #OCM: This is just the priors at this point.
     
     if tune_for is None:
         tune_for = n_iterations/2
@@ -325,8 +375,21 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
             # Calculate log posterior with proposed value
             proposed_log_prob = calc_posterior(*params)
     
-            # Log-acceptance rate (all other terms in RJMC are 1 in this case)
-            alpha = proposed_log_prob - current_log_prob
+            # Log-acceptance rate (all other terms in RJMC are 1 in this case)  
+            #OCM: This is not true
+            alpha = (proposed_log_prob - current_log_prob)
+            
+            #OCM: THIS NEEDS TO BE CORRECTED
+            #Metropolis-Hastings algorithm acceptance probability defined as alpha = min {1, q(x_j)p(x_j)/q(x_i)p(x_i)}
+            #By just calculating the log probs we are capturing the p(x) ratio, but not the q(x)
+            #Normally this isn't a problem for normal transition kernel used here, but when transition kernel also includes the T_matrix,
+            #which is a multiplicative transition, this will result in an incorrect transition matrix.  Need to implement this
+            #Seems like it would be easy to do just with one variable, but maybe a bit trickier with both eps and sig
+            #Correct acceptance ratio might look something like this:
+            
+            # alpha = (proposed_log_prob - current_log_prob) (Tmatrix_eps[current_model,proposed_model]/Tmatrix_eps[proposed_model,current_model]) (Tmatrix_sig[current_model,proposed_model]/Tmatrix_sig[proposed_model,current_model])
+            
+            
  
             # Sample a uniform random variate (urv)
             urv = runif()
@@ -357,6 +420,7 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
                 elif acceptance_rate>0.5:
                     prop_sd[j] *= 1.1                  
 
+                #print(prop_sd[j])
                 accepted[j] = 0              
 
     accept_prod = np.array(accepted)/(np.array(accepted)+np.array(rejected))                    
@@ -379,22 +443,27 @@ print('Acceptance Rate during production for eps, sig: '+str(acc_tuned[1:]))
 
 print('Acceptance model swap during production: '+str(model_swaps/(n_iter-tune_for)))
 
+#OCM: Something is wrong with this as it is greater than one, which shouldn't be possible.  Definitely should investigate this after figuring out the acceptance ratio
+
 prob_0 = 1.*model_count[0]/(n_iter-tune_for)
 print('Percent that single site LJ model is sampled: '+str(prob_0 * 100.)) #The percent that use 1 parameter model
 
 prob_1 = 1.*model_count[1]/(n_iter-tune_for)
-print('Percent that two-center UA LJ model is sampled: '+str(prob_1 * 100.)) #The percent that use 1 parameter model
+print('Percent that two-center UA LJ model is sampled: '+str(prob_1 * 100.)) #The percent that use two center UA LJ
      
 prob_2 = 1.*model_count[2]/(n_iter-tune_for)
-print('Percent that two-center AUA LJ model is sampled: '+str(prob_2 * 100.)) #The percent that use 1 parameter model
-     
+print('Percent that two-center AUA LJ model is sampled: '+str(prob_2 * 100.)) #The percent that use two center AUA LJ
+
+
+
+#%%     
 # Create plots of the Markov Chain values for epsilon, sigma, and precision     
 f, axes = plt.subplots(3, 2, figsize=(10,10))     
 for param, samples, samples_tuned, iparam in zip(['model','$\epsilon (K)$', '$\sigma (nm)$'], trace_all.T,trace_tuned.T, [0,1,2]):
     axes[iparam,0].plot(samples)
     axes[iparam,0].set_ylabel(param)
     axes[iparam,0].set_xlabel('Iteration')
-    axes[iparam,1].hist(samples_tuned)
+    axes[iparam,1].hist(samples_tuned,bins=50)
     axes[iparam,1].set_xlabel(param)
     axes[iparam,1].set_ylabel('Count')
     
@@ -474,6 +543,48 @@ axarr[1,1].set_xlabel("$T$ (K)")
 axarr[1,1].set_ylabel(r"$\Delta H_v \left(\frac{kJ}{mol}\right)$")
 
 plt.tight_layout(pad=0.2)
-
+plt.show()
 f.savefig(compound+"_Prop_RJMC.pdf")
- 
+#%%
+trace_0=[]
+trace_1=[]
+trace_2=[]
+for i in range(np.size(trace_tuned,0)):
+    if trace_tuned[i,0]==0:
+        trace_0.append(trace_tuned[i])
+    elif trace_tuned[i,0]==1:
+        trace_1.append(trace_tuned[i])
+    elif trace_tuned[i,0]==2:
+        trace_2.append(trace_tuned[i])
+#plt.plot(trace_2[:,1],trace_2[:,2])
+trace_0=np.asarray(trace_0)
+trace_1=np.asarray(trace_1)
+trace_2=np.asarray(trace_2)
+plt.scatter(trace_0[:,1],trace_0[:,2],label='LJ')
+plt.scatter(trace_1[:,1],trace_1[:,2],label='UA')
+plt.scatter(trace_2[:,1],trace_2[:,2],label='AUA')
+plt.legend()
+
+
+
+'''
+slope_0,intercept_0,r_value_0,p_value_0,std_err_0 = linregress(trace_0[:,1],trace_0[:,2])
+slope_1,intercept_1,r_value_1,p_value_1,std_err_1 = linregress(trace_1[:,1],trace_1[:,2])
+slope_2,intercept_2,r_value_2,p_value_2,std_err_2 = linregress(trace_2[:,1],trace_2[:,2])
+xx=np.linspace(80,250)
+plt.plot(xx,slope_0*xx+intercept_0)
+plt.plot(xx,slope_1*xx+intercept_1)
+plt.plot(xx,slope_2*xx+intercept_2)
+plt.show()
+
+slope_matrix=np.ones((3,3))
+slope_matrix[0,1]=slope_1/slope_0
+slope_matrix[0,2]=slope_2/slope_0
+slope_matrix[1,0]=slope_0/slope_1
+slope_matrix[1,2]=slope_2/slope_1
+slope_matrix[2,0]=slope_0/slope_2
+slope_matrix[2,1]=slope_1/slope_2
+'''
+#%%
+
+    
