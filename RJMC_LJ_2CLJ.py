@@ -178,6 +178,7 @@ guess_var = [1,20, 0.05]
 
 #OCM: All of this first section is Rich's data setup, which I don't have any reason to alter.  I am focusing more on the monte carlo implementation
 #%%
+'''
 T_lin=np.linspace(T_min,T_max,num=200)
 
 rhol_fake_data_model0=rhol_hat_models(T_rhol_data,0,eps_lit_LJ+0.01*eps_lit_LJ, sig_lit_LJ+0.01*sig_lit_LJ)
@@ -201,9 +202,8 @@ for i in range(np.size(T_rhol_data)):
         rhol_fake_data_mix[i]=rhol_fake_data_model2[i]
 print(num0)
 print(num1)
-
+'''
 #OCM: This was me attempting to create a fake dataset so that I could reliably reproduce sampling with the ratios of data that I made
-#The sampler needs to be working properly in order for this to work, however.  Which is most likely not true at this point.
 #%%
 # Simplify notation
 dnorm = distributions.norm.logpdf
@@ -213,7 +213,7 @@ duni = distributions.uniform.logpdf
 rnorm = np.random.normal
 runif = np.random.rand
 
-properties = 'rhol'
+properties = 'Psat'
 
 def calc_posterior(model,eps, sig):
 
@@ -241,6 +241,7 @@ def calc_posterior(model,eps, sig):
     #return rhol_hat
     
     #OCM: Standard calculation of the log posterior. Note that t_rhol and t_Psat are precisions
+    #This is one of the most important areas of the code for testing as it is where you can substitute in different data for training or change what property it is training on.
 
 def gen_Tmatrix():
     ''' Generate Transition matrices based on the optimal eps, sig for different models'''
@@ -277,7 +278,7 @@ def gen_Tmatrix():
     eps_opt_AUA, sig_opt_AUA = opt_AUA.x[0], opt_AUA.x[1]
     
     #OCM: Important distinction:  This is not the transition matrix in the tradition RJMC sense of the term, which may be confusing.
-    #This is a method of altering the proposal distribution q(eps,sig) to produce a move that is more likely to be accepted
+    #This is a map between the 3 different probability spaces/models.  We will use this to change our variables, and as part of the jacobian determinant to change the acceptance ratio.
     #This RJMC problem of disjoint high probability regions will likely be exacerbated with a high dimensional and variable model space.
     #Will probably require a more sophisticated solution like AIS-RJMC (https://www.tandfonline.com/doi/abs/10.1080/10618600.2013.805651)
     #But I expect that the approach here will work for relatively simple problems such as this one
@@ -375,19 +376,13 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
             # Calculate log posterior with proposed value
             proposed_log_prob = calc_posterior(*params)
     
-            # Log-acceptance rate (all other terms in RJMC are 1 in this case)  
-            #OCM: This is not true
-            alpha = (proposed_log_prob - current_log_prob)
+            # Log-acceptance rate
+            alpha = (proposed_log_prob - current_log_prob) + np.log(Tmatrix_eps[current_model,proposed_model]) + np.log(Tmatrix_sig[current_model,proposed_model])
             
-            #OCM: THIS NEEDS TO BE CORRECTED
-            #Metropolis-Hastings algorithm acceptance probability defined as alpha = min {1, q(x_j)p(x_j)/q(x_i)p(x_i)}
-            #By just calculating the log probs we are capturing the p(x) ratio, but not the q(x)
-            #Normally this isn't a problem for normal transition kernel used here, but when transition kernel also includes the T_matrix,
-            #which is a multiplicative transition, this will result in an incorrect transition matrix.  Need to implement this
-            #Seems like it would be easy to do just with one variable, but maybe a bit trickier with both eps and sig
-            #Correct acceptance ratio might look something like this:
             
-            # alpha = (proposed_log_prob - current_log_prob) (Tmatrix_eps[current_model,proposed_model]/Tmatrix_eps[proposed_model,current_model]) (Tmatrix_sig[current_model,proposed_model]/Tmatrix_sig[proposed_model,current_model])
+            #OCM:  The two components of the acceptance ratio here are the log of the ratio of the probabilities, and the log of the jacobian determinant between the model spaces
+            
+        
             
             
  
@@ -443,7 +438,7 @@ print('Acceptance Rate during production for eps, sig: '+str(acc_tuned[1:]))
 
 print('Acceptance model swap during production: '+str(model_swaps/(n_iter-tune_for)))
 
-#OCM: Something is wrong with this as it is greater than one, which shouldn't be possible.  Definitely should investigate this after figuring out the acceptance ratio
+#OCM: Something is wrong with this as it is greater than one, which shouldn't be possible.  Probably just a calculation error that doesn't affect RJMC
 
 prob_0 = 1.*model_count[0]/(n_iter-tune_for)
 print('Percent that single site LJ model is sampled: '+str(prob_0 * 100.)) #The percent that use 1 parameter model
@@ -565,26 +560,6 @@ plt.scatter(trace_1[:,1],trace_1[:,2],label='UA')
 plt.scatter(trace_2[:,1],trace_2[:,2],label='AUA')
 plt.legend()
 
-
-
-'''
-slope_0,intercept_0,r_value_0,p_value_0,std_err_0 = linregress(trace_0[:,1],trace_0[:,2])
-slope_1,intercept_1,r_value_1,p_value_1,std_err_1 = linregress(trace_1[:,1],trace_1[:,2])
-slope_2,intercept_2,r_value_2,p_value_2,std_err_2 = linregress(trace_2[:,1],trace_2[:,2])
-xx=np.linspace(80,250)
-plt.plot(xx,slope_0*xx+intercept_0)
-plt.plot(xx,slope_1*xx+intercept_1)
-plt.plot(xx,slope_2*xx+intercept_2)
-plt.show()
-
-slope_matrix=np.ones((3,3))
-slope_matrix[0,1]=slope_1/slope_0
-slope_matrix[0,2]=slope_2/slope_0
-slope_matrix[1,0]=slope_0/slope_1
-slope_matrix[1,2]=slope_2/slope_1
-slope_matrix[2,0]=slope_0/slope_2
-slope_matrix[2,1]=slope_1/slope_2
-'''
 #%%
 
     
