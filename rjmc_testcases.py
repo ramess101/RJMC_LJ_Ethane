@@ -26,6 +26,7 @@ from LennardJones_correlations import LennardJones
 from LennardJones_2Center_correlations import LennardJones_2C
 from scipy.stats import distributions
 from scipy.stats import linregress
+from scipy.stats import multivariate_normal as mvn
 from scipy.optimize import minimize
 import random as rm
 
@@ -33,15 +34,11 @@ import random as rm
 
 def test_pdf(model,x,y):
     if model == 0:
-        if 0 <= x <= 1 and 0 <= y <= 1:
-            f=5
-        else:
-            f=0
+        rv=mvn([-1,-1])#,[[1.0,1.0],[1.0,1.0]])
+        f=rv.pdf([x,y])
     if model == 1:
-        if 2 <= x <= 3 and 2 <= y <= 3:
-            f=5
-        else:
-            f=0     
+        rv=mvn([1,1])#,[[1.0,1.0],[1.0,1.0]])
+        f=rv.pdf([x,y])   
     return f
 
 dnorm = distributions.norm.logpdf
@@ -56,8 +53,8 @@ runif = np.random.rand
 def calc_posterior(model,x,y):
     
     logp = 0
-    logp += duni(x, 0, 10)
-    logp += duni(y, 0,10) 
+    logp += duni(x, -20, 40)
+    logp += duni(y, -20, 40) 
     prop_density=test_pdf(model,x,y)
     logp += np.log(prop_density)
     
@@ -67,10 +64,10 @@ def calc_posterior(model,x,y):
 def T_matrix_scale():
     T_matrix_x_scale=np.ones((2,2))
     T_matrix_y_scale=np.ones((2,2))
-    T_matrix_x_scale[0,1]=3
-    T_matrix_y_scale[0,1]=3
-    T_matrix_x_scale[1,0]=1./3
-    T_matrix_y_scale[1,0]=1./3
+    T_matrix_x_scale[0,1]=-1
+    T_matrix_y_scale[0,1]=-1
+    T_matrix_x_scale[1,0]=-1
+    T_matrix_y_scale[1,0]=-1
     return T_matrix_x_scale, T_matrix_y_scale
 
 
@@ -86,6 +83,10 @@ def T_matrix_translation():
 T_matrix_x, T_matrix_y = T_matrix_translation()
 T_matrix_x_scale, T_matrix_y_scale = T_matrix_scale()
 
+
+def accept_reject()
+
+
 def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var, 
                      tune_for=None, tune_interval=1, map_scale='False'):
     
@@ -93,6 +94,11 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
             
     # Initial proposal standard deviations
     prop_sd = prop_var
+    
+    #Initialize matrices to count number of moves of each type
+    attempt_matrix=np.zeros((n_params-1,n_params-1))
+    acceptance_matrix=np.zeros((n_params-1,n_params-1))
+
     
     # Initialize trace for parameters
     trace = np.zeros((n_iterations+1, n_params)) #n_iterations + 1 to account for guess
@@ -155,9 +161,9 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
                             params[2] += T_matrix_y[current_model,proposed_model]
                         # Calculate log posterior with proposed value
                         proposed_log_prob = calc_posterior(*params)
-    
+                        attempt_matrix[current_model,proposed_model]+=1
                         # Log-acceptance rate
-                        alpha = (proposed_log_prob - current_log_prob)# + np.log(T_matrix_x_scale[current_model,proposed_model]) + np.log(T_matrix_x_scale[current_model,proposed_model])
+                        alpha = (proposed_log_prob - current_log_prob) + np.log(T_matrix_x_scale[current_model,proposed_model]) + np.log(T_matrix_x_scale[current_model,proposed_model])
                         
                         urv = runif()
     
@@ -169,7 +175,9 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
                             logp_trace[i+1] = proposed_log_prob.copy()
                             current_log_prob = proposed_log_prob.copy()
                             current_params = params
-                            accepted[j] += 1
+                            
+                            
+                            #accepted[j] += 1
                             if j == 0:
                                 if proposed_model != current_model:
                                     model_swaps += 1
@@ -177,39 +185,43 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
             else:
                 if swap_flag=='False':
                     params[j] = rnorm(current_params[j], prop_sd[j])
-    
+            
+            attempt_matrix[current_model,current_model]+=1
+        
             # Calculate log posterior with proposed value
             proposed_log_prob = calc_posterior(*params)
     
             # Log-acceptance rate
             alpha = (proposed_log_prob - current_log_prob)
     
-    
-    #OCM:  The two components of the acceptance ratio here are the log of the ratio of the probabilities, and the log of the jacobian determinant between the model spaces
-    
 
+        #OCM:  The two components of the acceptance ratio here are the log of the ratio of the probabilities, and the log of the jacobian determinant between the model spaces
     
     
- 
-    # Sample a uniform random variate (urv)
+    
+    
+     
+            # Sample a uniform random variate (urv)
             urv = runif()
     
             # Test proposed value
-            if np.log(urv) < alpha:
+            if swap_flag == 'False':
+                if np.log(urv) < alpha:
                 
-                # Accept
-                trace[i+1] = params
-                logp_trace[i+1] = proposed_log_prob.copy()
-                current_log_prob = proposed_log_prob.copy()
-                current_params = params
-                accepted[j] += 1
-                #if j == 0:
-                #   if proposed_model != current_model:
-                #      model_swaps += 1
+                    # Accept
+                    trace[i+1] = params
+                    logp_trace[i+1] = proposed_log_prob.copy()
+                    current_log_prob = proposed_log_prob.copy()
+                    current_params = params
+                    accepted[j] += 1
+                    acceptance_matrix[current_model,current_model]+=1
+                    #if j == 0:
+                    #   if proposed_model != current_model:
+                    #      model_swaps += 1
                         
-            else:
-                # Reject
-                rejected[j] += 1
+                else:
+                    # Reject
+                    rejected[j] += 1
     
     '''
             # Tune every 100 iterations
@@ -228,39 +240,61 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
 
     print('Proposed standard deviations are: '+str(prop_sd))
                 
-    return trace, trace[tune_for:], logp_trace, logp_trace[tune_for:],accept_prod, model_swaps, model_swap_attempts
+    return trace, trace[tune_for:], logp_trace, logp_trace[tune_for:],accept_prod, model_swaps, model_swap_attempts,acceptance_matrix,attempt_matrix
+
+
+
 
 # Set the number of iterations to run RJMC and how long to tune for
-n_iter = 100000 # 20000 appears to be sufficient
+n_iter = 20000 # 20000 appears to be sufficient
 tune_for = 10000 #10000 appears to be sufficient
-guess_0=[0,0.5,0.5]
-guess_var=[1,0.1,0.1]
-trace_all,trace_tuned,logp_all,logp_tuned, acc_tuned, model_swaps, model_swap_attempts = RJMC_tuned(calc_posterior, n_iter, guess_0, prop_var=guess_var, tune_for=tune_for,map_scale='True')
+guess_0=[0,-1,-1]
+guess_var=[1,1,1]
+trace_all,trace_tuned,logp_all,logp_tuned, acc_tuned, model_swaps, model_swap_attempts,acceptance_matrix,attempt_matrix = RJMC_tuned(calc_posterior, n_iter, guess_0, prop_var=guess_var, tune_for=tune_for,map_scale='True')
+#%%
 
 
+'''
 print('Acceptance Rate during production for eps, sig: '+str(acc_tuned[1:]))
 
 print('Acceptance model swap during production: '+str(model_swaps/model_swap_attempts))
+'''
 
+print('Acceptance Rates')
+print(acceptance_matrix/attempt_matrix)
 #OCM: Something is wrong with this as it is greater than one, which shouldn't be possible.  Probably just a calculation error that doesn't affect RJMC
 
-model_params = trace_all[tune_for+1:,0]
+model_params = trace_all[:,0]
 
 # Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
 model_count = np.array([len(model_params[model_params==0]),len(model_params[model_params==1])])
 
 
-prob_0 = 1.*model_count[0]/(n_iter-tune_for)
-print('Percent that single site LJ model is sampled: '+str(prob_0 * 100.)) #The percent that use 1 parameter model
+prob_0 = 1.*model_count[0]/(n_iter)
+print('Percent that  model 0 is sampled: '+str(prob_0 * 100.)) #The percent that use 1 parameter model
 
-prob_1 = 1.*model_count[1]/(n_iter-tune_for)
-print('Percent that two-center UA LJ model is sampled: '+str(prob_1 * 100.)) #The percent that use two center UA LJ
-     
-
+prob_1 = 1.*model_count[1]/(n_iter)
+print('Percent that model 1 is sampled: '+str(prob_1 * 100.)) #The percent that use two center UA LJ
+    
+trace_model_0=[]
+trace_model_1=[]
+for i in range(np.size(trace_all,0)):
+    if trace_all[i,0] == 0:
+        trace_model_0.append(trace_all[i])
+    elif trace_all[i,0] == 1:
+        trace_model_1.append(trace_all[i])
+        
+        
+trace_model_0=np.asarray(trace_model_0)
+trace_model_1=np.asarray(trace_model_1)
 f = plt.figure()
-plt.scatter(trace_all[:,2],trace_all[:,1],label='Trajectory')
+plt.scatter(trace_model_0[:,2],trace_model_0[:,1],s=1,label='Model 0',marker=',')
+plt.scatter(trace_model_1[:,2],trace_model_1[:,1],s=1,label='Model 1',marker=',')
 plt.legend()
 plt.show()
 plt.plot(trace_all[:,0],label='Model Choice')
 plt.legend()
+plt.show()
+
+plt.plot(logp_all,label='Log Posterior')
 plt.show()
