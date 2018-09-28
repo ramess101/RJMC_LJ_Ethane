@@ -349,17 +349,22 @@ Tmatrix_eps, Tmatrix_sig = gen_Tmatrix()
 twoD_scan = True
 neps = 100
 nsig = 100
-scan_method = 1 #Method = 0, all scans use same region, Method = 1, scans use zoomed in region (should be more accurate)
+scan_method = 0 #Method = 0, all scans use same region, Method = 1, scans use zoomed in region (should be more accurate)
 
-logp_sum = {0:0,1:0,2:0}
-logp_opt = {0:-1e10,1:-1e10,2:-1e10}
-
-model_list = [0,1,2]
+model_list = [0,1,2,3]
 
 eps_low = {0:232,1:97,2:133}
 eps_high = {0:240,1:101,2:136.5}
 sig_low = {0:0.4185,1:0.3745,2:0.3505}
 sig_high = {0:0.4215,1:0.377,2:0.3527}
+
+logp_scan = {}
+logp_sum = {}
+logp_opt = {}
+
+for model in model_list: 
+    logp_sum[model] = 0
+    logp_opt[model] = -1e10
 
 if twoD_scan:
 
@@ -367,7 +372,8 @@ if twoD_scan:
         
         eps_scan = np.linspace(90,250,neps)
         sig_scan = np.linspace(0.35,0.43,nsig)
-        logp_scan = {0:np.zeros([neps,nsig]),1:np.zeros([neps,nsig]),2:np.zeros([neps,nsig])}
+        
+        for model in model_list: logp_scan[model] = np.zeros([neps,nsig])
     
         for ieps, eps in enumerate(eps_scan):
             
