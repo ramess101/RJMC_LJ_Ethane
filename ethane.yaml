@@ -8,6 +8,16 @@ force_field_params:
     Lbond_lit_AUA:       0.230 #[nm]
     lam_lit_AUA:     12
     
+    eps_lit2_AUA:     138.56    # [K]
+    sig_lit2_AUA:     0.34818   # [nm]
+    Lbond_lit2_AUA:       0.24161 #[nm]
+    Q_lit2_AUA:       0.145 #[Dnm]
+    
+    eps_lit3_AUA:     143.11     # [K]
+    sig_lit3_AUA:     0.34623   # [nm]
+    Lbond_lit3_AUA:       0.25577 #[nm]
+    Q_lit3_AUA:       0. #[Dnm]
+    
     eps_lit_UA:     98     # [K]
     sig_lit_UA:     0.375   # [nm]
     Lbond_lit_UA:       0.154 #[nm]
