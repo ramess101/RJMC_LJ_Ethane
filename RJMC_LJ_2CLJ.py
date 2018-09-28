@@ -178,31 +178,31 @@ guess_var = [1,20, 0.05]
 
 #OCM: All of this first section is Rich's data setup, which I don't have any reason to alter.  I am focusing more on the monte carlo implementation
 #%%
-'''
-T_lin=np.linspace(T_min,T_max,num=200)
 
-rhol_fake_data_model0=rhol_hat_models(T_rhol_data,0,eps_lit_LJ+0.01*eps_lit_LJ, sig_lit_LJ+0.01*sig_lit_LJ)
-rhol_fake_data_model1=rhol_hat_models(T_rhol_data,1,eps_lit_UA-0.01*eps_lit_UA,sig_lit_UA-0.01*sig_lit_UA)
-rhol_fake_data_model2=rhol_hat_models(T_rhol_data,2,eps_lit_AUA,sig_lit_AUA)
+T_lin=np.linspace(T_min,T_max,num=186)
+
+rhol_fake_data_model0=rhol_hat_models(T_lin,0,eps_lit_LJ, sig_lit_LJ)
+rhol_fake_data_model1=rhol_hat_models(T_lin,1,eps_lit_UA,sig_lit_UA)
+rhol_fake_data_model2=rhol_hat_models(T_lin,2,eps_lit_AUA,sig_lit_AUA)
 #plt.plot(T_rhol_data,rhol_fake_data_model0)
 #plt.plot(T_rhol_data,rhol_fake_data_model1)
 #plt.plot(T_rhol_data,rhol_fake_data_model2)
-rhol_fake_data_mix=np.empty(np.size(T_rhol_data))
+rhol_fake_data_mix=np.empty(np.size(T_lin))
 num0=0
 num1=0
 for i in range(np.size(T_rhol_data)):
     randi=np.random.random()
-    if randi <= 0.1:
+    if randi <= 0.3:
         rhol_fake_data_mix[i]=rhol_fake_data_model0[i]
         num0+=1
-    elif 0.1 < randi <= 0.9:
+    elif 0.3 < randi <= 0.6:
         rhol_fake_data_mix[i]=rhol_fake_data_model1[i]
         num1+=1
     else:
         rhol_fake_data_mix[i]=rhol_fake_data_model2[i]
 print(num0)
 print(num1)
-'''
+
 #OCM: This was me attempting to create a fake dataset so that I could reliably reproduce sampling with the ratios of data that I made
 #%%
 # Simplify notation
@@ -213,7 +213,7 @@ duni = distributions.uniform.logpdf
 rnorm = np.random.normal
 runif = np.random.rand
 
-properties = 'Psat'
+properties = 'rhol'
 
 def calc_posterior(model,eps, sig):
 
@@ -226,12 +226,14 @@ def calc_posterior(model,eps, sig):
     #But Rich is rightly being conservative here especially since evaluations are cheap.
     
 #    print(eps,sig)
+    #rhol_hat_fake = rhol_hat_models(T_lin,model,eps,sig)
     rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig) #[kg/m3]
     Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig) #[kPa]        
  
     # Data likelihood
     if properties == 'rhol':
         logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
+        #logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
     elif properties == 'Psat':
         logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
     elif properties == 'Multi':
@@ -510,11 +512,15 @@ for i in range(100): #Plot 100 random samples from production
     rhol_sample = rhol_hat_models(T_plot_rhol,model_sample,eps_sample,sig_sample)
     Psat_sample = Psat_hat_models(T_plot_Psat,model_sample,eps_sample,sig_sample)
 
-    axarr[0,0].plot(T_plot_rhol,rhol_sample,color_scheme[model_sample],alpha=0.5)
+    axarr[0,0].plot(T_plot_rhol,rhol_sample,color_scheme[model_sample],alpha=0.3)
     axarr[1,0].plot(T_plot_Psat,np.log10(Psat_sample),color_scheme[model_sample],alpha=0.5)
     axarr[0,1].plot(1000./T_plot_Psat,np.log10(Psat_sample),color_scheme[model_sample],alpha=0.5) 
 
-axarr[0,0].plot(T_rhol_data,rhol_data,'ko',mfc='None',label='TRC')
+
+axarr[0,0].plot(T_lin,rhol_fake_data_model0,ls='--',mfc='None',label='Model 0 Fake Data')
+axarr[0,0].plot(T_lin,rhol_fake_data_model1,'--',mfc='None',label='Model 1 Fake Data')
+axarr[0,0].plot(T_lin,rhol_fake_data_model2,':',mfc='None',label='Model 2 Fake Data')
+#axarr[0,0].plot(T_rhol_data,rhol_data,'ko',mfc='None',label='TRC')
 axarr[1,0].plot(T_Psat_data,np.log10(Psat_data),'ko',mfc='None',label='TRC')
 axarr[0,1].plot(1000./T_Psat_data,np.log10(Psat_data),'ko',mfc='None',label='TRC')
 axarr[1,1].plot(T_deltaHv,RP_deltaHv,'k--',label='REFPROP')
@@ -552,6 +558,8 @@ for i in range(np.size(trace_tuned,0)):
     elif trace_tuned[i,0]==2:
         trace_2.append(trace_tuned[i])
 #plt.plot(trace_2[:,1],trace_2[:,2])
+        
+        '''
 trace_0=np.asarray(trace_0)
 trace_1=np.asarray(trace_1)
 trace_2=np.asarray(trace_2)
@@ -559,7 +567,11 @@ plt.scatter(trace_0[:,1],trace_0[:,2],label='LJ')
 plt.scatter(trace_1[:,1],trace_1[:,2],label='UA')
 plt.scatter(trace_2[:,1],trace_2[:,2],label='AUA')
 plt.legend()
-
+'''
 #%%
 
-    
+plt.plot(T_lin,rhol_fake_data_model0,ls='--',mfc='None',label='Model 0 Fake Data')
+plt.plot(T_lin,rhol_fake_data_model1,'--',mfc='None',label='Model 1 Fake Data')
+plt.plot(T_lin,rhol_fake_data_model2,':',mfc='None',label='Model 2 Fake Data')
+plt.legend()
+plt.show()
