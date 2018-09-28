@@ -37,6 +37,14 @@ Lbond_lit_UA = yfile["force_field_params"]["Lbond_lit_UA"] #[nm]
 eps_lit_AUA = yfile["force_field_params"]["eps_lit_AUA"] #[K]
 sig_lit_AUA = yfile["force_field_params"]["sig_lit_AUA"] #[nm]
 Lbond_lit_AUA = yfile["force_field_params"]["Lbond_lit_AUA"] #[nm]
+eps_lit2_AUA = yfile["force_field_params"]["eps_lit2_AUA"] #[K]
+sig_lit2_AUA = yfile["force_field_params"]["sig_lit2_AUA"] #[nm]
+Lbond_lit2_AUA = yfile["force_field_params"]["Lbond_lit2_AUA"] #[nm]
+Q_lit2_AUA = yfile["force_field_params"]["Q_lit2_AUA"] #[DAng]
+eps_lit3_AUA = yfile["force_field_params"]["eps_lit3_AUA"] #[K]
+sig_lit3_AUA = yfile["force_field_params"]["sig_lit3_AUA"] #[nm]
+Lbond_lit3_AUA = yfile["force_field_params"]["Lbond_lit3_AUA"] #[nm]
+Q_lit3_AUA = yfile["force_field_params"]["Q_lit3_AUA"] #[DAng]
 Tc_RP = yfile["physical_constants"]["T_c"] #[K]
 rhoc_RP = yfile["physical_constants"]["rho_c"] #[kg/m3]
 M_w = yfile["physical_constants"]["M_w"] #[gm/mol]
@@ -66,6 +74,21 @@ def rhol_hat_models(Temp,model,eps,sig):
     elif model == 2: #Two center AUA LJ
     
         rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,Lbond_lit_AUA,0) 
+        
+    elif model == 3: #Two center AUA LJ+Q
+    
+        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,Lbond_lit2_AUA,Q_lit2_AUA) 
+        
+    elif model == 4: #Two center AUA LJ+Q=0
+    
+        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,Lbond_lit3_AUA,Q_lit3_AUA) 
+        
+    elif model == 5: #Two center AUA LJ with L correlation
+    
+        sigma0 = Lbond_lit_AUA+2.68*sig_lit_AUA
+        Lfit = sigma0 - 2.68*sig
+    
+        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,Lfit,0)
     
     return rhol_hat #[kg/m3]       
   
@@ -82,6 +105,21 @@ def Psat_hat_models(Temp,model,eps,sig):
     elif model == 2: #Two center AUA LJ
     
         Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,Lbond_lit_AUA,0) 
+        
+    elif model == 3: #Two center AUA LJ+Q
+    
+        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,Lbond_lit2_AUA,Q_lit2_AUA) 
+        
+    elif model == 4: #Two center AUA LJ+Q=0
+    
+        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,Lbond_lit3_AUA,Q_lit3_AUA) 
+        
+    elif model == 5: #Two center AUA LJ with L correlation
+    
+        sigma0 = Lbond_lit_AUA+2.68*sig_lit_AUA
+        Lfit = sigma0 - 2.68*sig
+    
+        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,Lfit,0) 
     
     return Psat_hat #[kPa]       
 
@@ -151,6 +189,9 @@ t_Psat = np.sqrt(1./sd_Psat)
 guess_0 = (0,eps_lit_LJ, sig_lit_LJ) # Can use critical constants
 guess_1 = (1,eps_lit_UA,sig_lit_UA)
 guess_2 = (2,eps_lit_AUA,sig_lit_AUA)
+guess_3 = (2,eps_lit2_AUA,sig_lit2_AUA)
+guess_4 = (2,eps_lit3_AUA,sig_lit3_AUA)
+guess_5 = (2,eps_lit_AUA,sig_lit_AUA)
 
 ## These transition matrices are designed for when rhol is the only target property
 #
@@ -278,7 +319,7 @@ def gen_Tmatrix():
     eps_opt_LJ, sig_opt_LJ = opt_LJ.x[0], opt_LJ.x[1]
     eps_opt_UA, sig_opt_UA = opt_UA.x[0], opt_UA.x[1]
     eps_opt_AUA, sig_opt_AUA = opt_AUA.x[0], opt_AUA.x[1]
-    
+        
     #OCM: Important distinction:  This is not the transition matrix in the tradition RJMC sense of the term, which may be confusing.
     #This is a map between the 3 different probability spaces/models.  We will use this to change our variables, and as part of the jacobian determinant to change the acceptance ratio.
     #This RJMC problem of disjoint high probability regions will likely be exacerbated with a high dimensional and variable model space.
@@ -304,6 +345,125 @@ def gen_Tmatrix():
     return Tmatrix_eps, Tmatrix_sig
 
 Tmatrix_eps, Tmatrix_sig = gen_Tmatrix()
+
+### Performs a 2-dimensional scan and integration of parameter space
+
+twoD_scan = True
+neps = 100
+nsig = 100
+scan_method = 0 #Method = 0, all scans use same region, Method = 1, scans use zoomed in region (should be more accurate)
+
+model_list = [0,1,2,3]
+
+eps_low = {0:232,1:97,2:133}
+eps_high = {0:240,1:101,2:136.5}
+sig_low = {0:0.4185,1:0.3745,2:0.3505}
+sig_high = {0:0.4215,1:0.377,2:0.3527}
+
+logp_scan = {}
+logp_sum = {}
+logp_opt = {}
+
+for model in model_list: 
+    logp_sum[model] = 0
+    logp_opt[model] = -1e10
+
+if twoD_scan:
+
+    if scan_method == 0:
+        
+        eps_scan = np.linspace(90,250,neps)
+        sig_scan = np.linspace(0.35,0.43,nsig)
+        
+        for model in model_list: logp_scan[model] = np.zeros([neps,nsig])
+    
+        for ieps, eps in enumerate(eps_scan):
+            
+            for isig, sig in enumerate(sig_scan):
+        
+                for model in model_list:
+                
+                    logp = calc_posterior(model,eps,sig)
+                    
+                    logp_scan[model][ieps,isig] = logp
+                    
+                    logp_sum[model] += logp
+                            
+                    if logp > logp_opt[model]:
+                            
+                        logp_opt[model] = logp
+
+    elif scan_method == 1:
+        
+        logp_scan = {0:[],1:[],2:[]}
+        eps_scan = {0:[],1:[],2:[]}
+        sig_scan = {0:[],1:[],2:[]}
+        
+        deps = 0.05
+        dsig = 0.00005
+       
+        for model in model_list:
+            
+            neps = int((eps_high[model] - eps_low[model])/deps)
+            nsig = int((sig_high[model] - sig_low[model])/dsig)
+            
+            eps_scan[model] = np.linspace(eps_low[model],eps_high[model],neps)
+            sig_scan[model] = np.linspace(sig_low[model],sig_high[model],nsig)
+            
+            logp_scan[model] = np.zeros([neps,nsig])
+
+            for ieps, eps in enumerate(eps_scan[model]):
+                
+                for isig, sig in enumerate(sig_scan[model]):
+                    
+                    logp = calc_posterior(model,eps,sig)
+                        
+                    logp_scan[model][ieps,isig] = logp
+                    
+                    logp_sum[model] += logp
+                            
+                    if logp > logp_opt[model]:
+                            
+                        logp_opt[model] = logp
+        
+#print(logp_sum)
+#print(logp_opt)
+
+### Combine the probabilities relative to the overall optimal
+prob_model = {0:[],1:[],2:[]}
+prob_model_total = {0:[],1:[],2:[]}
+prob_normal_model = 0
+
+for model in model_list:
+    
+    prob_model[model] = np.exp(logp_scan[model] - logp_opt[model])
+
+    prob_normal_model += np.nansum(prob_model[model])
+
+for model in model_list:
+    
+    prob_model[model] /= prob_normal_model
+              
+    prob_model_total[model] = np.nansum(prob_model[model])
+
+print('The relative probabilities of each model are: ')
+print(prob_model_total)
+
+if scan_method == 0:
+
+    for model in model_list:
+        plt.contour(sig_scan,eps_scan,prob_model[model])
+        plt.show()
+    
+elif scan_method == 1:
+
+    for model in model_list:
+        CS = plt.contour(sig_scan[model],eps_scan[model],prob_model[model])
+        plt.clabel(CS, inline=1, fontsize=10)
+        plt.colorbar(CS)
+        plt.xlabel(r'$\sigma$ (nm)')
+        plt.ylabel(r'$\epsilon$ (K)')
+        plt.show()
 
 #OCM: With more difficult distributions it might be important to update this distribution as we go along, if it is still viable.
 
@@ -478,7 +638,7 @@ f.savefig(compound+"_logp_RJMC.pdf")
 
 
 # Plot the eps and sig parameters that are sampled and compare with literature, critical point, and guess values
-f = plt.figure()
+f = plt.figure(figsize=[8,8])
 plt.scatter(trace_all[:,2],trace_all[:,1],label='Trajectory')
 plt.scatter(trace_tuned[:,2],trace_tuned[:,1],label='Production')
 #plt.scatter(sig_lit,eps_lit,label='Literature')
@@ -563,9 +723,9 @@ for i in range(np.size(trace_tuned,0)):
 trace_0=np.asarray(trace_0)
 trace_1=np.asarray(trace_1)
 trace_2=np.asarray(trace_2)
-plt.scatter(trace_0[:,1],trace_0[:,2],label='LJ')
-plt.scatter(trace_1[:,1],trace_1[:,2],label='UA')
-plt.scatter(trace_2[:,1],trace_2[:,2],label='AUA')
+if len(trace_0) > 0: plt.scatter(trace_0[:,1],trace_0[:,2],label='LJ')
+if len(trace_1) > 0: plt.scatter(trace_1[:,1],trace_1[:,2],label='UA')
+if len(trace_2) > 0: plt.scatter(trace_2[:,1],trace_2[:,2],label='AUA')
 plt.legend()
 '''
 #%%
