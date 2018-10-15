@@ -17,17 +17,26 @@ from scipy.stats import linregress
 from scipy.stats import multivariate_normal as mvn
 from scipy.optimize import minimize
 import random as rm
+import copy
 
 # Define probabilities for both regions
 
-def test_pdf(model,x,y):
+cov_matrix_0=[[0.2,0],[0,0.7]]
+cov_matrix_1=[[1,0],[0,1]]
+
+def test_pdf(model,x,y,cov_matrix_0,cov_matrix_1):
     if model == 0:
-        rv=mvn([2,10],[[0.1,0],[0,0.1]])
-        f=rv.pdf([x,y])
+        rv=mvn([5,5],cov_matrix_0)
+        f=rv.logpdf([x,y])
     if model == 1:
-        rv=mvn([10,2],[[0.1,0],[0,0.1]])
-        f=rv.pdf([x,y])   
+        rv=mvn([10,10],cov_matrix_1)
+        f=rv.logpdf([x,y])   
     return f
+
+
+normalization_0=(np.sqrt((2*np.pi**2*np.linalg.det(cov_matrix_0))))
+normalization_1=(np.sqrt((2*np.pi**2*np.linalg.det(cov_matrix_1))))
+ratio=normalization_0/normalization_1
 
 dnorm = distributions.norm.logpdf
 dgamma = distributions.gamma.logpdf
@@ -43,8 +52,8 @@ def calc_posterior(model,x,y):
     logp = 0
     logp += duni(x, -50, 100)
     logp += duni(y, -50, 100) 
-    prop_density=test_pdf(model,x,y)
-    logp += np.log(prop_density)
+    prop_density=test_pdf(model,x,y,cov_matrix_0,cov_matrix_1)
+    logp += prop_density
     
     return logp
 
@@ -52,10 +61,10 @@ def calc_posterior(model,x,y):
 def T_matrix_scale():
     T_matrix_x_scale=np.ones((2,2))
     T_matrix_y_scale=np.ones((2,2))
-    T_matrix_x_scale[0,1]=10/2
-    T_matrix_y_scale[0,1]=2/10
-    T_matrix_x_scale[1,0]=2/10
-    T_matrix_y_scale[1,0]=10/2
+    T_matrix_x_scale[0,1]=10/5
+    T_matrix_y_scale[0,1]=10/5
+    T_matrix_x_scale[1,0]=5/10
+    T_matrix_y_scale[1,0]=5/10
     return T_matrix_x_scale, T_matrix_y_scale
 
 '''
@@ -73,16 +82,17 @@ def T_matrix_translation():
 T_matrix_x_scale, T_matrix_y_scale = T_matrix_scale()
 
 
-swap_freq=0.5
+swap_freq=0.8
 #The fraction of times a model swap is suggested as the move, rather than an intra-model move
 
-def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_models,swap_freq):
+def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,T_matrix_1,T_matrix_2):
     
     
     #INITIAL SETUP FOR MC LOOP
     #-----------------------------------------------------------------------------------------#
     
     n_params = len(initial_values) #One column is the model number
+    accept_vector=np.zeros((n_iterations))
     prop_sd=initial_sd
     
     #Initialize matrices to count number of moves of each type
@@ -101,6 +111,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     
     logp_trace[0] = current_log_prob
     current_params=trace[0].copy()
+    record_acceptance='False'
     #----------------------------------------------------------------------------------------#
     
     #OUTER MCMC LOOP
@@ -111,105 +122,160 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
         
         # Grab current parameter values
         current_params = trace[i].copy()
-        trace[i+1] = current_params.copy() #Initialize the next step with the current step. Then update if MCMC move is accepted
         current_model = int(current_params[0])
-        logp_trace[i+1] = current_log_prob.copy()
+        current_log_prob = logp_trace[i].copy()
         
+        if i >= tune_for:
+            record_acceptance='True'
         
-        
-        new_params, new_log_prob, acceptance,attempt_matrix,acceptance_matrix = RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix)
-        
+        new_params, new_log_prob, attempt_matrix,acceptance_matrix,acceptance = RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix,T_matrix_1,T_matrix_2,record_acceptance)
         
         if acceptance == 'True':
-            logp_trace[i+1] = new_log_prob
-            trace[i+1] = new_params
-    return trace,logp_trace, attempt_matrix,acceptance_matrix
-            
+            accept_vector[i]=1
+        logp_trace[i+1] = new_log_prob
+        trace[i+1] = new_params
+        '''
+        if (not (i+1) % tune_freq) and (i < tune_for):
         
+            print('Tuning on step %1.1i' %i)
+            #print(np.sum(accept_vector[i-tune_freq:]))
+            acceptance_rate = np.sum(accept_vector)/i           
+            print(acceptance_rate)
+            for m in range (n_params-1):
+                if acceptance_rate<0.2:
+                    prop_sd[m+1] *= 0.9
+                    print('Yes')
+                elif acceptance_rate>0.5:
+                    prop_sd[m+1] *= 1.1
+                    print('No')         
+           
+            '''
+    return trace,logp_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector
+            
+
+            
     
     
-def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix):
+def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix,T_matrix_1,T_matrix_2,record_acceptance):
     
-    params = current_params.copy() # This approach updates previous param values
+    params = current_params.copy()# This approach updates previous param values
     #Grab a copy of the current params to work with
+    #current_log_prob_copy=copy.deepcopy(current_log_prob)
     
     #Roll a dice to decide what kind of move will be suggested
     mov_ran=np.random.random()
     
+    swap='False'
     if mov_ran <= swap_freq:
+        swap = 'True'
+        
+        '''
         move_type = 'Swap'
     else: 
         move_type = 'Trad'
     
         
     if move_type == 'Swap':
-        proposed_model=int(np.floor(np.random.random()*n_models))
-        if proposed_model == current_model:
-            move_type = 'Trad'
-            #Fix this later, should grab another proposed model
-        else:
-            #Propose new values for the model and map the current values to the new model
-            params[0] = proposed_model
-            params[1] *= T_matrix_x_scale[current_model,proposed_model]
-            params[2] *= T_matrix_y_scale[current_model,proposed_model]
-            
-            #Accept or Reject this proposed model with the metropolis-hastings acceptance criteria
-            new_params,new_log_prob,acceptance,attempt_matrix,acceptance_matrix = accept_reject(current_log_prob,params,current_model,proposed_model,T_matrix_x_scale,T_matrix_y_scale,attempt_matrix,acceptance_matrix)
-            
-            
-            
-    if move_type == 'Trad':
-        for j in range(n_params-1):
-            params[j+1] = rnorm(params[j+1], prop_sd[j+1])
-            
-        new_params,new_log_prob,acceptance,attempt_matrix,acceptance_matrix = accept_reject(current_log_prob,params,current_model,current_model,T_matrix_x_scale,T_matrix_y_scale,attempt_matrix,acceptance_matrix)
-            
+        '''
+        params,rjmc_jacobian,proposed_model=model_proposal(current_model,n_models,params,T_matrix_1,T_matrix_2)
         
-            #Don't update the first parameter (model number) 
-            #Find a better way of doing this in the future
+        
+        
+        
+            #Set params back to original values
+                    
+    params,proposed_log_prob=parameter_proposal(params,n_params,prop_sd)
+         
+    
+    if  swap == 'True':
+         alpha = (proposed_log_prob - current_log_prob) + rjmc_jacobian
+    else:
+        alpha = (proposed_log_prob - current_log_prob)
+   
+    acceptance=accept_reject(alpha)
+     
+    if acceptance =='True':
+         new_log_prob=proposed_log_prob
+         new_params=params
+         if record_acceptance == 'True':
+             if swap == 'True':
+                 acceptance_matrix[current_model,proposed_model]+=1
+                 attempt_matrix[current_model,proposed_model]+=1
+             else:
+                 acceptance_matrix[current_model,current_model]+=1
+                 attempt_matrix[current_model,current_model]+=1
+    elif acceptance == 'False':
+             new_params=current_params
+             new_log_prob=current_log_prob
+             if record_acceptance == 'True':
+                 if swap == 'True':
+                     attempt_matrix[current_model,proposed_model]+=1
+                 else:
+                     attempt_matrix[current_model,current_model]+=1
+        #Accept or Reject this proposed model with the metropolis-hastings acceptance criteria
+        
+            
+            
+            
+    #if move_type == 'Trad':
+     
+    
+    #current_log_prob_copy=copy.deepcopy(current_log_prob)
+    '''
+    proposed_param=int(np.ceil(np.random.random()*(n_params-1)))
+    params[proposed_param] = rnorm(params[proposed_param], prop_sd[proposed_param])
+    proposed_log_prob=calc_posterior(*params)
+    
+        '''
+
+
+    
+        #Don't update the first parameter (model number) 
+        #Find a better way of doing this in the future
                    
-    return new_params,new_log_prob,acceptance,attempt_matrix,acceptance_matrix
+    return new_params,new_log_prob,attempt_matrix,acceptance_matrix,acceptance
             
             
             
-def accept_reject(current_log_prob,params,current_model,proposed_model,T_matrix_x,T_matrix_y,attempt_matrix,acceptance_matrix):
-    
-    attempt_matrix[current_model,proposed_model]+=1
-    
-    
-    proposed_log_prob = calc_posterior(*params)
-    
-    log_jacobian = np.log(T_matrix_x[current_model,proposed_model]) + np.log(T_matrix_y[current_model,proposed_model])
-    
-    alpha = (proposed_log_prob - current_log_prob) + log_jacobian
-    
-    
-    urv = runif()
-    
-    if np.log(urv) < alpha:
-    
-        # Accept
-        new_params = params
-        new_log_prob = proposed_log_prob.copy()
-
+def accept_reject(alpha):    
+    urv=runif()
+    if np.log(urv) < alpha:  
         acceptance='True'
-        acceptance_matrix[current_model,proposed_model]+=1
     else: 
-        #This should be different, doesn't matter for now
-        new_params = params
-        new_log_prob = proposed_log_prob.copy()
         acceptance='False'
+    return acceptance
+        
+def model_proposal(current_model,n_models,params,T_matrix_1,T_matrix_2):
+    proposed_model=current_model
+    while proposed_model==current_model:
+        proposed_model=int(np.floor(np.random.random()*n_models))
+            
+    params[0] = proposed_model
+    params[1] *= T_matrix_1[current_model,proposed_model]
+    params[2] *= T_matrix_2[current_model,proposed_model]
 
+    #proposed_log_prob=calc_posterior(*params)
+    rjmc_jacobian =  np.log(T_matrix_1[current_model,proposed_model]) + np.log(T_matrix_2[current_model,proposed_model])
+    return params,rjmc_jacobian,proposed_model
+    #Switch models and map parameters to new distributions
     
-    return new_params,new_log_prob,acceptance,attempt_matrix,acceptance_matrix
+    
+    
+def parameter_proposal(params,n_params,prop_sd):
+    proposed_param=int(np.ceil(np.random.random()*(n_params-1)))
+    params[proposed_param] = rnorm(params[proposed_param], prop_sd[proposed_param])
+    proposed_log_prob=calc_posterior(*params)
+    return params, proposed_log_prob
+        
 
-
-initial_values=[0,0,0]
-initial_sd=[1,0.5,0.5]
+initial_values=[1,15,15]
+initial_sd=[1,1,1]
 n_iterations=100000
+tune_freq=100
+tune_for=10000
 n_models=2
 
-trace,logp_trace,attempt_matrix,acceptance_matrix = RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_models,swap_freq)
+trace,logp_trace,attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,T_matrix_x_scale,T_matrix_y_scale)
 
 #%%
 # POST PROCESSING
@@ -218,20 +284,30 @@ print('Attempted Moves')
 print(attempt_matrix)
 
 prob_matrix=acceptance_matrix/attempt_matrix
-print('Acceptance Rates:')
-print(prob_matrix)
-
-model_params = trace[:,0]
+transition_matrix=np.ones((2,2))
+transition_matrix[0,0]=1-prob_matrix[0,1]
+transition_matrix[0,1]=prob_matrix[0,1]
+transition_matrix[1,0]=prob_matrix[1,0]
+transition_matrix[1,1]=1-prob_matrix[1,0]
+print('Transition Matrix:')
+print(transition_matrix)
+trace_tuned = trace[tune_for:]
+model_params = trace_tuned[:,0]
 
 # Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
 model_count = np.array([len(model_params[model_params==0]),len(model_params[model_params==1])])
 
 
-prob_0 = 1.*model_count[0]/(n_iterations)
+prob_0 = 1.*model_count[0]/(n_iterations-tune_for)
 print('Percent that  model 0 is sampled: '+str(prob_0 * 100.)) #The percent that use 1 parameter model
 
-prob_1 = 1.*model_count[1]/(n_iterations)
+prob_1 = 1.*model_count[1]/(n_iterations-tune_for)
 print('Percent that model 1 is sampled: '+str(prob_1 * 100.)) #The percent that use two center UA LJ
+
+Exp_ratio=prob_0/prob_1
+
+print('Analytical sampling ratio: %2.3f' % ratio)
+print('Experimental sampling ratio: %2.3f' % Exp_ratio )
 
 
 print('Detailed Balance')
@@ -240,32 +316,42 @@ print(prob_1*prob_matrix[1,0])
     
 trace_model_0=[]
 trace_model_1=[]
-for i in range(np.size(trace,0)):
-    if trace[i,0] == 0:
-        trace_model_0.append(trace[i])
-    elif trace[i,0] == 1:
-        trace_model_1.append(trace[i])
+for i in range(np.size(trace_tuned,0)):
+    if trace_tuned[i,0] == 0:
+        trace_model_0.append(trace_tuned[i])
+    elif trace_tuned[i,0] == 1:
+        trace_model_1.append(trace_tuned[i])
         
         
 trace_model_0=np.asarray(trace_model_0)
 trace_model_1=np.asarray(trace_model_1)
 f = plt.figure()
-plt.scatter(trace_model_0[:,2],trace_model_0[:,1],s=1,label='Model 0',marker=',',alpha=0.7)
-plt.scatter(trace_model_1[:,2],trace_model_1[:,1],s=1,label='Model 1',marker=',',alpha=0.7)
+plt.scatter(trace_model_0[::10,1],trace_model_0[::10,2],s=1,label='Model 0',marker=',',alpha=0.7)
+plt.scatter(trace_model_1[::10,1],trace_model_1[::10,2],s=1,label='Model 1',marker=',',alpha=0.7)
 plt.legend()
 plt.show()
 
-plt.hist(trace[:,1],bins=50,label='x values')
+plt.plot(trace[::500,1],trace[::500,2])
+plt.show()
+
+
+#trace_model_0_subsample=trace_model_0[::1000]
+#trace_model_1_subsample=trace_model_1[::1000]
+#trace_subsample=trace_tuned[::1000]
+#Try subsampling to make the graphs look better.
+plt.hist(trace_model_0[:,1],bins=100,label='x values Model 0')
+plt.hist(trace_model_1[:,1],bins=100,label='x values Model 1')
 plt.legend()
 plt.show()
 
 
-plt.hist(trace[:,2],bins=50,label='y values')
+plt.hist(trace_model_0[:,2],bins=100,label='y values Model 0')
+plt.hist(trace_model_1[:,2],bins=100,label='y values Model 1')
 plt.legend()
 plt.show()
 
 
-plt.plot(trace[:,0],label='Model Choice')
+plt.plot(trace_tuned[:,0],label='Model Choice')
 plt.legend()
 plt.show()
 
