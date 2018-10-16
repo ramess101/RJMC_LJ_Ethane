@@ -351,14 +351,14 @@ Tmatrix_eps, Tmatrix_sig = gen_Tmatrix()
 twoD_scan = True
 neps = 100
 nsig = 100
-scan_method = 0 #Method = 0, all scans use same region, Method = 1, scans use zoomed in region (should be more accurate)
+scan_method = 1 #Method = 0, all scans use same region, Method = 1, scans use zoomed in region (should be more accurate)
 
-model_list = [0,1,2,3]
+model_list = [0,1,2]
 
-eps_low = {0:232,1:97,2:133}
-eps_high = {0:240,1:101,2:136.5}
-sig_low = {0:0.4185,1:0.3745,2:0.3505}
-sig_high = {0:0.4215,1:0.377,2:0.3527}
+eps_low = {0:230,1:95,2:130}
+eps_high = {0:245,1:105,2:140}
+sig_low = {0:0.4175,1:0.374,2:0.349}
+sig_high = {0:0.422,1:0.38,2:0.355}
 
 logp_scan = {}
 logp_sum = {}
@@ -400,7 +400,7 @@ if twoD_scan:
         sig_scan = {0:[],1:[],2:[]}
         
         deps = 0.05
-        dsig = 0.00005
+        dsig = 0.0005
        
         for model in model_list:
             
@@ -425,9 +425,6 @@ if twoD_scan:
                     if logp > logp_opt[model]:
                             
                         logp_opt[model] = logp
-        
-#print(logp_sum)
-#print(logp_opt)
 
 ### Combine the probabilities relative to the overall optimal
 prob_model = {0:[],1:[],2:[]}
@@ -464,142 +461,212 @@ elif scan_method == 1:
         plt.xlabel(r'$\sigma$ (nm)')
         plt.ylabel(r'$\epsilon$ (K)')
         plt.show()
-
-#OCM: With more difficult distributions it might be important to update this distribution as we go along, if it is still viable.
-
-def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var, 
-                     tune_for=None, tune_interval=1):
+        
+#%%
+def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,T_matrix_1,T_matrix_2):
+    
+    
+    #INITIAL SETUP FOR MC LOOP
+    #-----------------------------------------------------------------------------------------#
     
     n_params = len(initial_values) #One column is the model number
-            
-    # Initial proposal standard deviations
-    prop_sd = prop_var
+    accept_vector=np.zeros((n_iterations,3))
+    attempt_vector=np.zeros((n_iterations,3))
+    prop_sd=initial_sd
+    
+    #Initialize matrices to count number of moves of each type
+    attempt_matrix=np.zeros((n_params,n_models,n_models))
+    acceptance_matrix=np.zeros((n_params,n_models,n_models))
+    
     
     # Initialize trace for parameters
     trace = np.zeros((n_iterations+1, n_params)) #n_iterations + 1 to account for guess
     logp_trace = np.zeros(n_iterations+1)
     # Set initial values
     trace[0] = initial_values
-
-    # Initialize acceptance counts
-    accepted = [0]*n_params
-    rejected = [0]*n_params
-               
-    model_swaps = 0
-    model_swap_attempts = 0
-    swap_freq = 1
-    
-    # OCM: Currently attempting a model swap every single move, although this can be easily changed.  This is something that is not of critical importance now but will be important in the future.
     
     # Calculate joint posterior for initial values
     current_log_prob = calc_posterior(*trace[0])
     
     logp_trace[0] = current_log_prob
-    #OCM: This is just the priors at this point.
+    current_params=trace[0].copy()
+    record_acceptance='False'
+    #----------------------------------------------------------------------------------------#
     
-    if tune_for is None:
-        tune_for = n_iterations/2
+    #OUTER MCMC LOOP
     
     for i in range(n_iterations):
-    
-        if not i%1000: print('Iteration '+str(i))
-    
+        if not i%10000: print('Iteration '+str(i))
+        
+        
         # Grab current parameter values
         current_params = trace[i].copy()
-        trace[i+1] = current_params.copy() #Initialize the next step with the current step. Then update if MCMC move is accepted
         current_model = int(current_params[0])
-        logp_trace[i+1] = current_log_prob.copy()
+        current_log_prob = logp_trace[i].copy()
         
-        # Loop through model parameters
+        if i >= tune_for:
+            record_acceptance='True'
         
-        for j in range(n_params):
-    
-            # Get current value for parameter j
-            params = current_params.copy() # This approach updates previous param values
-            
-            # Propose new values
-            if j == 0: #If proposing a new model
-                if not i%swap_freq:
-                    mod_ran = np.random.random()
-                    if mod_ran < 1./3: #Use new models with equal probability
-                        proposed_model = 0
-                    elif mod_ran < 2./3:
-                        proposed_model = 1
-                    elif mod_ran < 1:
-                        proposed_model = 2
-                    if proposed_model != current_model:
-                        model_swap_attempts += 1
-                        params[0] = proposed_model
-                        params[1] *= Tmatrix_eps[current_model,proposed_model]
-                        params[2] *= Tmatrix_sig[current_model,proposed_model]
-            else:        
-                params[j] = rnorm(current_params[j], prop_sd[j])
-    
-            # Calculate log posterior with proposed value
-            proposed_log_prob = calc_posterior(*params)
-    
-            # Log-acceptance rate
-            alpha = (proposed_log_prob - current_log_prob) + np.log(Tmatrix_eps[current_model,proposed_model]) + np.log(Tmatrix_sig[current_model,proposed_model])
-            
-            
-            #OCM:  The two components of the acceptance ratio here are the log of the ratio of the probabilities, and the log of the jacobian determinant between the model spaces
-            
+        new_params, new_log_prob, attempt_matrix,acceptance_matrix,acceptance,proposed_param = RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix,T_matrix_1,T_matrix_2,record_acceptance)
         
+        
+        attempt_vector[i,proposed_param]+=1
+        if acceptance == 'True':
+            accept_vector[i,proposed_param]+=1
+        logp_trace[i+1] = new_log_prob
+        trace[i+1] = new_params
+        
+        if (not (i+1) % tune_freq) and (i < tune_for):
+            prop_sd=proposal_tuning(prop_sd,accept_vector,attempt_vector,n_params)
             
+           
+    attempt_matrix_final=np.sum(attempt_matrix,0)
+    acceptance_matrix_final=np.sum(acceptance_matrix,0)       
+    trace_tuned=trace[tune_for:]
+    logp_trace_tuned=logp_trace[tune_for:]
+    return trace,logp_trace,trace_tuned,logp_trace_tuned,attempt_matrix_final,acceptance_matrix_final,prop_sd,accept_vector,attempt_vector,swap_freq
             
- 
-            # Sample a uniform random variate (urv)
-            urv = runif()
+
+            
     
-            # Test proposed value
-            if np.log(urv) < alpha:
+    
+def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix,T_matrix_1,T_matrix_2,record_acceptance):
+    
+    params = current_params.copy()# This approach updates previous param values
+    #Grab a copy of the current params to work with
+    #current_log_prob_copy=copy.deepcopy(current_log_prob)
+    
+    #Roll a dice to decide what kind of move will be suggested
+    mov_ran=np.random.random()
+    
+    if mov_ran <= swap_freq:
+        
+        params,rjmc_jacobian,proposed_log_prob,proposed_model=model_proposal(current_model,n_models,params,T_matrix_1,T_matrix_2)
+        
+        alpha = (proposed_log_prob - current_log_prob) + rjmc_jacobian
+        
+        acceptance=accept_reject(alpha)
+        
+        if acceptance =='True':
+            new_log_prob=proposed_log_prob
+            new_params=params
+            if record_acceptance == 'True':
+                acceptance_matrix[0,current_model,proposed_model]+=1
+                attempt_matrix[0,current_model,proposed_model]+=1
+        elif acceptance == 'False':
+            new_params=current_params
+            new_log_prob=current_log_prob
+            if record_acceptance == 'True':
+                attempt_matrix[0,current_model,proposed_model]+=1
+        proposed_param=0
+        '''
+        move_type = 'Swap'
+    else: 
+        move_type = 'Trad'
+    
+        
+    if move_type == 'Swap':
+        '''
+    else:
+        params,proposed_log_prob,proposed_param=parameter_proposal(params,n_params,prop_sd)    
+        
+        alpha = (proposed_log_prob - current_log_prob)
+    
+        acceptance=accept_reject(alpha)
+                    
+    
+        if acceptance =='True':
+            new_log_prob=proposed_log_prob
+            new_params=params
+            if record_acceptance == 'True':
+                 acceptance_matrix[proposed_param,current_model,current_model]+=1
+                 attempt_matrix[proposed_param,current_model,current_model]+=1
+        elif acceptance == 'False':
+             new_params=current_params
+             new_log_prob=current_log_prob
+             if record_acceptance == 'True':
+                attempt_matrix[proposed_param,current_model,current_model]+=1
+    
+    
+    return new_params,new_log_prob,attempt_matrix,acceptance_matrix,acceptance,proposed_param
+            
+            
+            
+def accept_reject(alpha):    
+    urv=runif()
+    if np.log(urv) < alpha:  
+        acceptance='True'
+    else: 
+        acceptance='False'
+    return acceptance
+        
+def model_proposal(current_model,n_models,params,T_matrix_1,T_matrix_2):
+    proposed_model=current_model
+    while proposed_model==current_model:
+        proposed_model=int(np.floor(np.random.random()*n_models))
+            
+    params[0] = proposed_model
+    params[1] *= T_matrix_1[current_model,proposed_model]
+    params[2] *= T_matrix_2[current_model,proposed_model]
+
+    proposed_log_prob=calc_posterior(*params)
+    rjmc_jacobian =  np.log(T_matrix_1[current_model,proposed_model]) + np.log(T_matrix_2[current_model,proposed_model])
+    return params,rjmc_jacobian,proposed_log_prob, proposed_model
+    #Switch models and map parameters to new distributions
+    
+    
+    
+def parameter_proposal(params,n_params,prop_sd):
+    proposed_param=int(np.ceil(np.random.random()*(n_params-1)))
+    params[proposed_param] = rnorm(params[proposed_param], prop_sd[proposed_param])
+    proposed_log_prob=calc_posterior(*params)
+    return params, proposed_log_prob,proposed_param
+
+
+def proposal_tuning(prop_sd,accept_vector,attempt_vector,n_params):
+    #print('Tuning on step %1.1i' %i)
+    #print(np.sum(accept_vector[i-tune_freq:]))
+    acceptance_rate = np.sum(accept_vector,0)/np.sum(attempt_vector,0)        
+    #print(acceptance_rate)
+    for m in range (n_params):
+        if m != 0:
+           if acceptance_rate[m]<0.2:
+               prop_sd[m] *= 0.9
+               #print('Yes')
+           elif acceptance_rate[m]>0.5:
+               prop_sd[m] *= 1.1
+               #print('No')
                 
-                # Accept
-                trace[i+1] = params
-                logp_trace[i+1] = proposed_log_prob.copy()
-                current_log_prob = proposed_log_prob.copy()
-                current_params = params
-                accepted[j] += 1
-                if j == 0:
-                    if proposed_model != current_model:
-                        model_swaps += 1
-                        
-            else:
-                # Reject
-                rejected[j] += 1
-            
-            # Tune every 100 iterations
-            if (not (i+1) % tune_interval) and (i < tune_for) and j != 0:
+    return prop_sd
+        
+initial_values=(0,eps_lit_LJ, sig_lit_LJ) # Can use critical constants
+initial_sd = [1,20, 0.05]
+n_iter=200000
+tune_freq=100
+tune_for=20000
+n_models=3
+swap_freq=0.2
+#The fraction of times a model swap is suggested as the move, rather than an intra-model move
+trace,logp_trace,trace_tuned,logp_trace_tuned,attempt_matrix,acceptance_matrix,prop_sd,accept_vector,attempt_vector,swap_freq = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,Tmatrix_eps,Tmatrix_sig)        
+        
+#%%        
+#print(logp_sum)
+#print(logp_opt)
 
-                acceptance_rate = (1.*accepted[j])/tune_interval             
-                if acceptance_rate<0.2:
-                    prop_sd[j] *= 0.9
-                elif acceptance_rate>0.5:
-                    prop_sd[j] *= 1.1                  
 
-                #print(prop_sd[j])
-                accepted[j] = 0              
+#OCM: With more difficult distributions it might be important to update this distribution as we go along, if it is still viable.
 
-    accept_prod = np.array(accepted)/(np.array(accepted)+np.array(rejected))                    
 
-    print('Proposed standard deviations are: '+str(prop_sd))
-                
-    return trace, trace[tune_for:], logp_trace, logp_trace[tune_for:],accept_prod, model_swaps
 
-# Set the number of iterations to run RJMC and how long to tune for
-n_iter = 20000 # 20000 appears to be sufficient
-tune_for = 10000 #10000 appears to be sufficient
-trace_all,trace_tuned,logp_all,logp_tuned, acc_tuned, model_swaps = RJMC_tuned(calc_posterior, n_iter, guess_0, prop_var=guess_var, tune_for=tune_for)
-
-model_params = trace_all[tune_for+1:,0]
+model_params = trace[tune_for+1:,0]
 
 # Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
 model_count = np.array([len(model_params[model_params==0]),len(model_params[model_params==1]),len(model_params[model_params==2])])
-
+'''
 print('Acceptance Rate during production for eps, sig: '+str(acc_tuned[1:]))
 
 print('Acceptance model swap during production: '+str(model_swaps/(n_iter-tune_for)))
-
+'''
 #OCM: Something is wrong with this as it is greater than one, which shouldn't be possible.  Probably just a calculation error that doesn't affect RJMC
 
 prob_0 = 1.*model_count[0]/(n_iter-tune_for)
@@ -611,12 +678,40 @@ print('Percent that two-center UA LJ model is sampled: '+str(prob_1 * 100.)) #Th
 prob_2 = 1.*model_count[2]/(n_iter-tune_for)
 print('Percent that two-center AUA LJ model is sampled: '+str(prob_2 * 100.)) #The percent that use two center AUA LJ
 
+prob_vec=np.asarray([prob_0,prob_1,prob_2])
+
+print('Attempted Moves')
+print(attempt_matrix)
+print('Accepted Moves')
+print(acceptance_matrix)
+
+prob_matrix=acceptance_matrix/attempt_matrix
 
 
+transition_matrix=np.zeros((n_models,n_models))
+
+
+
+for i in range(n_models):
+    for j in range(n_models):
+        if i != j:
+            transition_matrix[i,j]=acceptance_matrix[i,j]/np.sum(attempt_matrix[i,:])
+for i in range(n_models):
+    transition_matrix[i,i]=1-np.sum(transition_matrix[i,:])
+print('Transition Matrix:')
+print(transition_matrix)
+
+
+for i in range(n_models):
+    for j in range(n_models):
+        if i != j and i < j:
+            print('Detailed Balance for model pairing:'+ str(i),str(j))
+            print('%7.4f' % (prob_vec[i]*transition_matrix[i,j]))
+            print('%7.4f' % (prob_vec[j]*transition_matrix[j,i]))
 #%%     
 # Create plots of the Markov Chain values for epsilon, sigma, and precision     
 f, axes = plt.subplots(3, 2, figsize=(10,10))     
-for param, samples, samples_tuned, iparam in zip(['model','$\epsilon (K)$', '$\sigma (nm)$'], trace_all.T,trace_tuned.T, [0,1,2]):
+for param, samples, samples_tuned, iparam in zip(['model','$\epsilon (K)$', '$\sigma (nm)$'], trace.T,trace_tuned.T, [0,1,2]):
     axes[iparam,0].plot(samples)
     axes[iparam,0].set_ylabel(param)
     axes[iparam,0].set_xlabel('Iteration')
@@ -627,31 +722,63 @@ for param, samples, samples_tuned, iparam in zip(['model','$\epsilon (K)$', '$\s
 plt.tight_layout(pad=0.2)
 
 f.savefig(compound+"_Trace_RJMC.pdf")
-
+#%%
+trace_0=[]
+trace_1=[]
+trace_2=[]
+for i in range (np.size(trace_tuned,0)):
+    if trace_tuned[i,0] == 0:
+        trace_0.append(trace_tuned[i])
+    if trace_tuned[i,0] == 1:
+        trace_1.append(trace_tuned[i])
+    if trace_tuned[i,0] == 2:
+        trace_2.append(trace_tuned[i])
+        
+trace_0=np.asarray(trace_0)
+trace_1=np.asarray(trace_1)
+trace_2=np.asarray(trace_2)
 # Plot logp
 f = plt.figure()
-plt.semilogy(-logp_all)
+plt.semilogy(-logp_trace)
 plt.xlabel('Iteration')
 plt.ylabel('-logPosterior')
 
 f.savefig(compound+"_logp_RJMC.pdf")  
-
+trace_0=np.array(trace_0)
+trace_1=np.array(trace_1)
+trace_2=np.array(trace_2)
 
 # Plot the eps and sig parameters that are sampled and compare with literature, critical point, and guess values
-f = plt.figure(figsize=[8,8])
-plt.scatter(trace_all[:,2],trace_all[:,1],label='Trajectory')
-plt.scatter(trace_tuned[:,2],trace_tuned[:,1],label='Production')
+f = plt.figure(figsize=[5,5])
+#plt.scatter(trace_all[:,2],trace_all[:,1],label='Trajectory')
+plt.scatter(trace_0[:,2],trace_0[:,1],label='LJ Trajectory',marker='.',color='c')
+plt.scatter(trace_1[:,2],trace_1[:,1],label='2CLJ UA Trajectory',marker='.',color='m')
+plt.scatter(trace_2[:,2],trace_2[:,1],label='2CLJ AUA Trajectory',marker='.',color='y')
+plt.title('RJMC Trajectory, LJ Ethane models')
 #plt.scatter(sig_lit,eps_lit,label='Literature')
 #plt.scatter(sig_rhoc,eps_Tc,label='Critical Point')
-plt.scatter(guess_0[2],guess_0[1],label='Guess LJ')
-plt.scatter(guess_1[2],guess_1[1],label='Guess 2CLJ UA')
-plt.scatter(guess_2[2],guess_2[1],label='Guess 2CLJ AUA')
-plt.xlabel('$\sigma (nm)$')
-plt.ylabel('$\epsilon (K)$')
+#plt.scatter(guess_0[2],guess_0[1],label='Literature LJ',color='b')
+#plt.scatter(guess_1[2],guess_1[1],label='Literature 2CLJ UA',color='r')
+#plt.scatter(guess_2[2],guess_2[1],label='Literature 2CLJ AUA',color='g')
+plt.xlabel('$\sigma (nm)$',fontsize='large')
+plt.ylabel('$\epsilon (K)$',fontsize='large')
 plt.legend()
 
-f.savefig(compound+"_Trajectory_RJMC.pdf")  
+a = plt.axes([0.55, 0.3, 0.3, 0.3])
 
+plt.scatter(trace_0[:,2],trace_0[:,1],marker='.',color='c')
+#plt.scatter(guess_0[2],guess_0[1],label='Literature LJ',color='b')
+plt.xlim([0.417,0.423])
+#a.xlim(220,240)
+#a.ylim([0.42,0.425])
+a.axes([0.42,0.425,220,240])
+
+plt.xticks([])
+plt.yticks([])
+plt.show()
+f.savefig(compound+"_Trajectory_RJMC.pdf")  
+#%%%
+'''
 T_plot_deltaHv = np.linspace(T_deltaHv.min(), T_deltaHv.max())
 T_plot_rhol = np.linspace(T_rhol_data.min(), T_rhol_data.max())
 T_plot_Psat = np.linspace(T_Psat_data.min(), T_Psat_data.max())
@@ -674,7 +801,8 @@ for i in range(100): #Plot 100 random samples from production
 
     axarr[0,0].plot(T_plot_rhol,rhol_sample,color_scheme[model_sample],alpha=0.3)
     axarr[1,0].plot(T_plot_Psat,np.log10(Psat_sample),color_scheme[model_sample],alpha=0.5)
-    axarr[0,1].plot(1000./T_plot_Psat,np.log10(Psat_sample),color_scheme[model_sample],alpha=0.5) 
+    axarr[0,1].plot(1000./T_plot_Psat,np.log10(Psat_sample),color_scheme[model_sample],alpha=0.5)
+    plt.savefig('rjmc_ethane_trajectory',format='pdf')
 
 
 axarr[0,0].plot(T_lin,rhol_fake_data_model0,ls='--',mfc='None',label='Model 0 Fake Data')
@@ -718,8 +846,8 @@ for i in range(np.size(trace_tuned,0)):
     elif trace_tuned[i,0]==2:
         trace_2.append(trace_tuned[i])
 #plt.plot(trace_2[:,1],trace_2[:,2])
-        
-        '''
+'''       
+'''
 trace_0=np.asarray(trace_0)
 trace_1=np.asarray(trace_1)
 trace_2=np.asarray(trace_2)
@@ -729,9 +857,10 @@ if len(trace_2) > 0: plt.scatter(trace_2[:,1],trace_2[:,2],label='AUA')
 plt.legend()
 '''
 #%%
-
+'''
 plt.plot(T_lin,rhol_fake_data_model0,ls='--',mfc='None',label='Model 0 Fake Data')
 plt.plot(T_lin,rhol_fake_data_model1,'--',mfc='None',label='Model 1 Fake Data')
 plt.plot(T_lin,rhol_fake_data_model2,':',mfc='None',label='Model 2 Fake Data')
 plt.legend()
 plt.show()
+'''
