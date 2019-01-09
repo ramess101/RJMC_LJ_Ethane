@@ -9,6 +9,7 @@ Problem of interest: We are interested in drawing samples from \emph{multiple} p
  A widely accepted method of simulating such draws is through the Reversible Jump Markov Chain Monte Carlo (RJMC) algorithm.  The algorithm modifies the traditional Metropolis-Hastings algorithm by adding a Jacobian term that maps between dimensional space.  For a transition between state $x$ and proposed state $x'$, the transition probability is given by:
 
 \begin{equation}
+
 \alpha(x,x') = \mathrm{min} \left \{ 1, \frac{\pi(x')j(x'|x)g'(u')}{\pi(x)j(x|x')g(u)} \left | \frac{\partial(x',u')}{\partial(x,u)} \right | \right \}
 \end{equation}
 
@@ -34,7 +35,7 @@ This is a standard M-H MCMC move.  However, for MC moves between models, it is s
 g^{\epsilon}_{i\rightarrow j}(\sigma_i,\epsilon_i)=\left ( \frac{\epsilon^{opt}_j}{\epsilon^{opt}_i}\right ) \epsilon_i \, ; \, g^{\sigma}_{i\rightarrow j}(\sigma_i,\epsilon_i)=\left ( \frac{\sigma^{opt}_j}{\sigma^{opt}_i}\right ) \sigma_i
 \end{equation}
 \begin{equation}
-\epsilon_j=g_{i\rightarrow j,\epsilon}(\sigma_i,\epsilon_i) \, ; \, \sigma_j=g_{i\rightarrow j,\sigma}(\sigma_i,\epsilon_i)
+\epsilon_j=g^{\epsilon}_{i\rightarrow j}(\sigma_i,\epsilon_i) \, ; \, \sigma_j=g^{\sigma}_{i\rightarrow j}(\sigma_i,\epsilon_i)
 \end{equation}
 
 It is important to recognize that the variables $\sigma_i$ and $\sigma_j$ are \emph{different} variables that we are transforming between.  It is helpful to think of the transition $(\sigma_i,\epsilon_i)\rightarrow (\sigma_j,\epsilon_j)$ as "stretching" and "squashing" the variable space $\sigma_i \times \epsilon_i$ so that it is equivalent to the variable space $\sigma_j \times \epsilon_j$.

@@ -60,27 +60,27 @@ sig_rhoc = Ethane_LJ.calc_sig_rhoc(rhoc_RP) #[nm]
 
 # Create functions that return properties for a given model, eps, sig
 
-def rhol_hat_models(Temp,model,eps,sig,Q):
+def rhol_hat_models(Temp,model,eps,sig,L,Q):
     
     if model == 0: #Two center AUA LJ
     
-        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,Lbond_lit_AUA,0) 
+        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,0) 
         
     elif model == 1: #Two center AUA LJ+Q
     
-        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,Lbond_lit2_AUA,Q) 
+        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,Q) 
         
     return rhol_hat #[kg/m3]       
   
-def Psat_hat_models(Temp,model,eps,sig,Q):
+def Psat_hat_models(Temp,model,eps,sig,L,Q):
     
     if model == 0: #Two center AUA LJ
     
-        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,Lbond_lit_AUA,Q) 
+        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,Q) 
         
     elif model == 1: #Two center AUA LJ+Q
     
-        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,Lbond_lit2_AUA,Q) 
+        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,Q) 
         
     return Psat_hat #[kPa]       
 
@@ -149,8 +149,8 @@ t_Psat = np.sqrt(1./sd_Psat)
 
 # Initial values for the Markov Chain
 
-guess_0 = [0,eps_lit_AUA,sig_lit_AUA,0]
-guess_1 = [1,eps_lit2_AUA,sig_lit2_AUA,Q_lit2_AUA]
+guess_0 = [0,eps_lit_AUA,sig_lit_AUA,Lbond_lit_AUA,0]
+guess_1 = [1,eps_lit2_AUA,sig_lit2_AUA,Lbond_lit2_AUA,Q_lit2_AUA]
 
 ## These transition matrices are designed for when rhol is the only target property
 #
@@ -171,7 +171,7 @@ guess_1 = [1,eps_lit2_AUA,sig_lit2_AUA,Q_lit2_AUA]
 #Tmatrix_sig[2,1] = sig_lit_UA/sig_lit_AUA           
            
 # Initial estimates for standard deviation used in proposed distributions of MCMC
-guess_var = [1,20,0.05,0.02]
+guess_var = [1,20,0.05,0.05,0.02]
 # Variance (or standard deviation, need to verify which one it is) in priors for epsilon and sigma
 #prior_var = [5,0.001]
 
@@ -202,7 +202,7 @@ unif=distributions.uniform.pdf
 
 properties = 'rhol'
 
-def calc_posterior(model,eps,sig,Q):
+def calc_posterior(model,eps,sig,L,Q):
 
     logp = 0
 #    print(eps,sig)
@@ -216,14 +216,14 @@ def calc_posterior(model,eps,sig,Q):
     
     if model == 1:
         logp+=duni(Q,0,2)
-    
+        logp+=duni(L,0,1)
     # OCM: no reason to use anything but uniform priors at this point.  Could probably narrow the prior ranges a little bit to improve acceptance,
     #But Rich is rightly being conservative here especially since evaluations are cheap.
     
 #    print(eps,sig)
     #rhol_hat_fake = rhol_hat_models(T_lin,model,eps,sig)
-    rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig,Q) #[kg/m3]
-    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig,Q) #[kPa]        
+    rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig,L,Q) #[kg/m3]
+    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig,L,Q) #[kPa]        
  
     # Data likelihood
     if properties == 'rhol':
@@ -261,15 +261,15 @@ def transition_function(n_models,w):
 def gen_Tmatrix():
     ''' Generate Transition matrices based on the optimal eps, sig, Q for different models'''
     
-    obj_AUA = lambda eps_sig_Q: -calc_posterior(0,eps_sig_Q[0],eps_sig_Q[1],eps_sig_Q[2])
-    obj_AUA_Q = lambda eps_sig_Q: -calc_posterior(1,eps_sig_Q[0],eps_sig_Q[1],eps_sig_Q[2])
+    obj_AUA = lambda eps_sig_Q: -calc_posterior(0,eps_sig_Q[0],eps_sig_Q[1],eps_sig_Q[2],eps_sig_Q[3])
+    obj_AUA_Q = lambda eps_sig_Q: -calc_posterior(1,eps_sig_Q[0],eps_sig_Q[1],eps_sig_Q[2],eps_sig_Q[3])
     
-    guess_AUA = [guess_0[1],guess_0[2],guess_0[3]]
-    guess_AUA_Q = [guess_1[1],guess_1[2],guess_0[3]]
+    guess_AUA = [guess_0[1],guess_0[2],guess_0[3],guess_0[4]]
+    guess_AUA_Q = [guess_1[1],guess_1[2],guess_1[3],guess_1[4]]
     
     # Make sure bounds are in a reasonable range so that models behave properly
-    bnd_AUA = ((0.85*guess_0[1],guess_0[1]*1.15),(0.90*guess_0[2],guess_0[2]*1.1),(0.90*guess_0[3],guess_0[3]*1.1))
-    bnd_AUA_Q = ((0.85*guess_1[1],guess_1[1]*1.15),(0.9*guess_1[2],guess_1[2]*1.1),(0.9*guess_1[3],guess_1[3]*1.1))
+    bnd_AUA = ((0.85*guess_0[1],guess_0[1]*1.15),(0.90*guess_0[2],guess_0[2]*1.1),(0.90*guess_0[3],guess_0[3]*1.1),(0.90*guess_0[4],guess_0[4]*1.1))
+    bnd_AUA_Q = ((0.85*guess_1[1],guess_1[1]*1.15),(0.9*guess_1[2],guess_1[2]*1.1),(0.9*guess_1[3],guess_1[3]*1.1),(0.90*guess_1[4],guess_1[4]*1.1))
     
     #Help debug
 #    print(bnd_LJ)
@@ -284,8 +284,8 @@ def gen_Tmatrix():
 #    print(opt_UA)
 #    print(opt_AUA)
         
-    AUA_opt_params = opt_AUA.x[0], opt_AUA.x[1],opt_AUA.x[2]
-    AUA_Q_opt_params = opt_AUA_Q.x[0], opt_AUA_Q.x[1],opt_AUA_Q.x[2]
+    AUA_opt_params = opt_AUA.x[0], opt_AUA.x[1],opt_AUA.x[2],opt_AUA.x[3]
+    AUA_Q_opt_params = opt_AUA_Q.x[0], opt_AUA_Q.x[1],opt_AUA_Q.x[2],opt_AUA_Q.x[3]
     
     return AUA_opt_params, AUA_Q_opt_params
 
@@ -477,7 +477,7 @@ guess_params=np.zeros((2,np.size(guess_0)))
 guess_params[0,:]=guess_0
 guess_params[1,:]=guess_1
 
-initial_sd = [1,2, 0.005,0.1]
+initial_sd = [1,2, 0.01,0.01,0.5]
 guess_sd=np.zeros((2,np.size(guess_0)))
 guess_sd[0,:]=initial_sd
 guess_sd[1,:]=initial_sd
@@ -485,12 +485,12 @@ n_models=2
 
 def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
     swap_freq=0.0
-    n_iter=100000
+    n_iter=2000000
     tune_freq=100
     tune_for=10000
     parameter_prior_proposal=np.empty((n_models,np.size(guess_params,1),2))
 
-    for i in range(n_models):
+    for i in range(1,n_models):
         initial_values=guess_params[i,:]
         initial_sd=guess_sd[i,:]
         trace,logp_trace,attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,1,1,1,1)
@@ -508,13 +508,15 @@ def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
             plt.hist(trace_tuned[:,j],density=True,bins=50)
             plt.plot(support,norm(support,*parameter_prior_proposal[i,j]))
             plt.show()
-    return parameter_prior_proposal
+        plt.scatter(trace_tuned[:,3],trace_tuned[:,4])
+        plt.show()
+    return parameter_prior_proposal,trace_tuned
 
 
 
 
 
-parameter_prior_proposals=mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd)
+parameter_prior_proposals,trace_tuned=mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd)
 
 def calc_posterior_refined(model,eps,sig,Q):
 
@@ -555,13 +557,13 @@ def calc_posterior_refined(model,eps,sig,Q):
 
 initial_values=guess_1 # Can use critical constants
 initial_sd = [1,2, 0.005,0.01]
-n_iter=500000
+n_iter=1000000
 tune_freq=100
 tune_for=10000
 n_models=2
 swap_freq=0.01
 #The fraction of times a model swap is suggested as the move, rather than an intra-model move
-trace,logp_trace,attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior_refined,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params)
+#trace,logp_trace,attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior_refined,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params)
 
 
 #def MCMC_priors(RJMC_outerloop)

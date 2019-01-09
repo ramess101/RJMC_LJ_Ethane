@@ -18,19 +18,25 @@ from scipy.stats import multivariate_normal as mvn
 from scipy.optimize import minimize
 import random as rm
 import copy
+from pymc3.stats import hpd
 
 # Define probabilities for both regions
 
-cov_matrix_0=[[0.2,0],[0,0.7]]
+data_vec=[5,1,4,1,3,3,1,6,1,1,2,4,3,1,2,1,0,2,2,2,3,2,3,3,1,2,2,3,2,4,1,1,3,3,2,3,3,3,7,7,1,3,3,3,4,3,1,1,7,3,2,2,2,5,1,2,2,3,2,4,1,3,2,6]
+
+cov_matrix_0=[[1,0],[0,1]]
 cov_matrix_1=[[1,0],[0,1]]
 
 def test_pdf(model,x,y,cov_matrix_0,cov_matrix_1):
     if model == 0:
         rv=mvn([5,5],cov_matrix_0)
-        f=rv.logpdf([x,y])
+        f=np.log(5)+rv.logpdf([x,y])
     if model == 1:
-        rv=mvn([10,10],cov_matrix_1)
-        f=rv.logpdf([x,y])   
+        rv=mvn([40,40],cov_matrix_1)
+        f=rv.logpdf([x,y])
+#    if model == 2:
+#        rv=mvn([20,20],cov_matrix_1)
+#        f=rv.logpdf([x,y])
     return f
 
 
@@ -61,10 +67,10 @@ def calc_posterior(model,x,y):
 def T_matrix_scale():
     T_matrix_x_scale=np.ones((2,2))
     T_matrix_y_scale=np.ones((2,2))
-    T_matrix_x_scale[0,1]=10/5
-    T_matrix_y_scale[0,1]=10/5
-    T_matrix_x_scale[1,0]=5/10
-    T_matrix_y_scale[1,0]=5/10
+    T_matrix_x_scale[0,1]=40/5
+    T_matrix_y_scale[0,1]=40/5
+    T_matrix_x_scale[1,0]=5/40
+    T_matrix_y_scale[1,0]=5/40
     return T_matrix_x_scale, T_matrix_y_scale
 
 '''
@@ -82,7 +88,7 @@ def T_matrix_translation():
 T_matrix_x_scale, T_matrix_y_scale = T_matrix_scale()
 
 
-swap_freq=0.8
+swap_freq=0.5
 #The fraction of times a model swap is suggested as the move, rather than an intra-model move
 
 def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,T_matrix_1,T_matrix_2):
@@ -134,7 +140,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
             accept_vector[i]=1
         logp_trace[i+1] = new_log_prob
         trace[i+1] = new_params
-        '''
+        
         if (not (i+1) % tune_freq) and (i < tune_for):
         
             print('Tuning on step %1.1i' %i)
@@ -149,7 +155,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
                     prop_sd[m+1] *= 1.1
                     print('No')         
            
-            '''
+            
     return trace,logp_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector
             
 
@@ -165,10 +171,25 @@ def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,
     #Roll a dice to decide what kind of move will be suggested
     mov_ran=np.random.random()
     
-    swap='False'
     if mov_ran <= swap_freq:
-        swap = 'True'
         
+        params,rjmc_jacobian,proposed_log_prob,proposed_model=model_proposal(current_model,n_models,params,T_matrix_1,T_matrix_2)
+        
+        alpha = (proposed_log_prob - current_log_prob) + rjmc_jacobian
+        
+        acceptance=accept_reject(alpha)
+        
+        if acceptance =='True':
+            new_log_prob=proposed_log_prob
+            new_params=params
+            if record_acceptance == 'True':
+                acceptance_matrix[current_model,proposed_model]+=1
+                attempt_matrix[current_model,proposed_model]+=1
+        elif acceptance == 'False':
+            new_params=current_params
+            new_log_prob=current_log_prob
+            if record_acceptance == 'True':
+                attempt_matrix[current_model,proposed_model]+=1
         '''
         move_type = 'Swap'
     else: 
@@ -177,61 +198,26 @@ def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,
         
     if move_type == 'Swap':
         '''
-        params,rjmc_jacobian,proposed_model=model_proposal(current_model,n_models,params,T_matrix_1,T_matrix_2)
-        
-        
-        
-        
-            #Set params back to original values
-                    
-    params,proposed_log_prob=parameter_proposal(params,n_params,prop_sd)
-         
-    
-    if  swap == 'True':
-         alpha = (proposed_log_prob - current_log_prob) + rjmc_jacobian
     else:
+        params,proposed_log_prob=parameter_proposal(params,n_params,prop_sd)    
+        
         alpha = (proposed_log_prob - current_log_prob)
-   
-    acceptance=accept_reject(alpha)
-     
-    if acceptance =='True':
-         new_log_prob=proposed_log_prob
-         new_params=params
-         if record_acceptance == 'True':
-             if swap == 'True':
-                 acceptance_matrix[current_model,proposed_model]+=1
-                 attempt_matrix[current_model,proposed_model]+=1
-             else:
+    
+        acceptance=accept_reject(alpha)
+                    
+    
+        if acceptance =='True':
+            new_log_prob=proposed_log_prob
+            new_params=params
+            if record_acceptance == 'True':
                  acceptance_matrix[current_model,current_model]+=1
                  attempt_matrix[current_model,current_model]+=1
-    elif acceptance == 'False':
+        elif acceptance == 'False':
              new_params=current_params
              new_log_prob=current_log_prob
              if record_acceptance == 'True':
-                 if swap == 'True':
-                     attempt_matrix[current_model,proposed_model]+=1
-                 else:
-                     attempt_matrix[current_model,current_model]+=1
-        #Accept or Reject this proposed model with the metropolis-hastings acceptance criteria
-        
-            
-            
-            
-    #if move_type == 'Trad':
-     
+                attempt_matrix[current_model,current_model]+=1
     
-    #current_log_prob_copy=copy.deepcopy(current_log_prob)
-    '''
-    proposed_param=int(np.ceil(np.random.random()*(n_params-1)))
-    params[proposed_param] = rnorm(params[proposed_param], prop_sd[proposed_param])
-    proposed_log_prob=calc_posterior(*params)
-    
-        '''
-
-
-    
-        #Don't update the first parameter (model number) 
-        #Find a better way of doing this in the future
                    
     return new_params,new_log_prob,attempt_matrix,acceptance_matrix,acceptance
             
@@ -254,9 +240,9 @@ def model_proposal(current_model,n_models,params,T_matrix_1,T_matrix_2):
     params[1] *= T_matrix_1[current_model,proposed_model]
     params[2] *= T_matrix_2[current_model,proposed_model]
 
-    #proposed_log_prob=calc_posterior(*params)
+    proposed_log_prob=calc_posterior(*params)
     rjmc_jacobian =  np.log(T_matrix_1[current_model,proposed_model]) + np.log(T_matrix_2[current_model,proposed_model])
-    return params,rjmc_jacobian,proposed_model
+    return params,rjmc_jacobian,proposed_log_prob, proposed_model
     #Switch models and map parameters to new distributions
     
     
@@ -270,7 +256,7 @@ def parameter_proposal(params,n_params,prop_sd):
 
 initial_values=[1,15,15]
 initial_sd=[1,1,1]
-n_iterations=100000
+n_iterations=50000
 tune_freq=100
 tune_for=10000
 n_models=2
@@ -333,20 +319,30 @@ plt.show()
 
 plt.plot(trace[::500,1],trace[::500,2])
 plt.show()
-
+map_x_0=hpd(trace_model_0[:,1],alpha=0.05)
+map_x_1=hpd(trace_model_1[:,1],alpha=0.05)
+map_y_0=hpd(trace_model_0[:,2],alpha=0.05)
+map_y_1=hpd(trace_model_1[:,2],alpha=0.05)
+CI_x_0=map_x_0[1]-map_x_0[0]
+CI_x_1=map_x_1[1]-map_x_1[0]
+CI_y_0=map_y_0[1]-map_y_0[0]
+CI_y_1=map_y_1[1]-map_y_1[0]
 
 #trace_model_0_subsample=trace_model_0[::1000]
 #trace_model_1_subsample=trace_model_1[::1000]
 #trace_subsample=trace_tuned[::1000]
 #Try subsampling to make the graphs look better.
-plt.hist(trace_model_0[:,1],bins=100,label='x values Model 0')
-plt.hist(trace_model_1[:,1],bins=100,label='x values Model 1')
+plt.hist(trace_model_0[:,1],bins=100,label='x values Model 0',density=True)
+
+
+plt.hist(trace_model_1[:,1],bins=100,label='x values Model 1',density=True)
+
 plt.legend()
 plt.show()
 
 
-plt.hist(trace_model_0[:,2],bins=100,label='y values Model 0')
-plt.hist(trace_model_1[:,2],bins=100,label='y values Model 1')
+plt.hist(trace_model_0[:,2],bins=100,label='y values Model 0',density=True)
+plt.hist(trace_model_1[:,2],bins=100,label='y values Model 1',density=True)
 plt.legend()
 plt.show()
 
@@ -359,4 +355,15 @@ plt.plot(logp_trace,label='Log Posterior')
 plt.legend()
 plt.show()
 
+swap01=0
+swap10=0
+same=0
 
+for i in range(np.size(logp_trace)-1):
+
+    if trace[i+1][0] < trace[i][0]:
+        swap10+=1
+    elif trace[i+1][0] > trace[i][0]:
+        swap01+=1
+    else:
+        same+=1

@@ -34,7 +34,7 @@ import random as rm
 
 # Define probabilities for both regions
 
-def test_pdf(model,x,y):
+def test_pdf_1(model,x,y):
     if model == 0:
         if 0 <= x <= 1 and 0 <= y <= 1:
             f=5
@@ -52,6 +52,27 @@ def test_pdf(model,x,y):
             f=0     
     return f
 
+
+def test_pdf_2(model,x,y):
+    if model == 0:
+        if 0 <= x <= 1 and 0 <= y <= 1:
+            f=5
+        else:
+            f=0
+    if model == 1:
+        if 1 <= x <= 3 and 1 <= y <= 3:
+            f=5
+        else:
+            f=0     
+            
+    if model == 2:
+        if 3 <= x <= 6 and 3 <= y <= 6:
+            f=5
+        else:
+            f=0    
+            
+    return f
+    
 dnorm = distributions.norm.logpdf
 dgamma = distributions.gamma.logpdf
 duni = distributions.uniform.logpdf
@@ -65,29 +86,49 @@ def calc_posterior(model,x,y):
     
     logp = 0
     logp += duni(x, 0, 10)
-    logp += duni(y, 0,10) 
-    prop_density=test_pdf(model,x,y)
+    logp += duni(y, 0, 10)
+    
+    #prop_density=test_pdf_1(model,x,y)
+    prop_density=test_pdf_2(model,x,y)
     logp += np.log(prop_density)
     
     return logp
 
 
-def T_matrix_scale():
+def T_matrix_scale_one():
     T_matrix_x_scale=np.ones((3,3))
     T_matrix_y_scale=np.ones((3,3))
-    T_matrix_x_scale[0,1]=2
-    T_matrix_y_scale[0,1]=2
-    T_matrix_x_scale[1,0]=1./2
-    T_matrix_y_scale[1,0]=1./2
-    T_matrix_x_scale[0,2]=5
-    T_matrix_y_scale[0,2]=5
-    T_matrix_x_scale[2,0]=1./5
-    T_matrix_y_scale[2,0]=1./5
-    T_matrix_x_scale[1,2]=5./2
-    T_matrix_y_scale[1,2]=5./2
-    T_matrix_x_scale[2,1]=2./5
-    T_matrix_y_scale[2,1]=2./5
+    T_matrix_x_scale[0,1]=3
+    T_matrix_y_scale[0,1]=3
+    T_matrix_x_scale[1,0]=1./3
+    T_matrix_y_scale[1,0]=1./3
+    T_matrix_x_scale[0,2]=6
+    T_matrix_y_scale[0,2]=6
+    T_matrix_x_scale[2,0]=1./6
+    T_matrix_y_scale[2,0]=1./6
+    T_matrix_x_scale[1,2]=6./3
+    T_matrix_y_scale[1,2]=6./3
+    T_matrix_x_scale[2,1]=3./6
+    T_matrix_y_scale[2,1]=3./6
     return T_matrix_x_scale, T_matrix_y_scale
+
+def T_matrix_scale_two():
+    T_matrix_x_scale=np.ones((3,3))
+    T_matrix_y_scale=np.ones((3,3))
+    T_matrix_x_scale[0,1]=4
+    T_matrix_x_scale[1,0]=1./4
+    T_matrix_x_scale[0,2]=9
+    T_matrix_x_scale[2,0]=1./9
+    T_matrix_x_scale[1,2]=9/4
+    T_matrix_x_scale[2,1]=4./9
+    T_matrix_y_scale[0,1]=4
+    T_matrix_y_scale[1,0]=1./4
+    T_matrix_y_scale[0,2]=9
+    T_matrix_y_scale[2,0]=1./9
+    T_matrix_y_scale[1,2]=9./4
+    T_matrix_y_scale[2,1]=4./9
+    return T_matrix_x_scale, T_matrix_y_scale
+
 
 
 def T_matrix_translation():
@@ -99,8 +140,8 @@ def T_matrix_translation():
     T_matrix_y[1,0]=-2
     return T_matrix_x, T_matrix_y
     
-T_matrix_x, T_matrix_y = T_matrix_translation()
-T_matrix_x_scale, T_matrix_y_scale = T_matrix_scale()
+T_matrix_x_scale_1, T_matrix_y_scale_1 = T_matrix_scale_one()
+T_matrix_x_scale_2, T_matrix_y_scale_2 = T_matrix_scale_two()
 
 def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var, 
                      tune_for=None, tune_interval=1, map_scale='False'):
@@ -166,17 +207,22 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
                         model_swap_attempts += 1
                         params[0] = proposed_model
                         if map_scale=='True':
-                            params[1] *= T_matrix_x_scale[current_model,proposed_model]
-                            params[2] *= T_matrix_y_scale[current_model,proposed_model]
+                            params[1] *= T_matrix_x_scale_1[current_model,proposed_model]
+                            params[2] *= T_matrix_y_scale_1[current_model,proposed_model]
+    
+                            #params[1] *= T_matrix_x_scale_2[current_model,proposed_model]
+                            #params[2] *= T_matrix_y_scale_2[current_model,proposed_model]
+                            '''
                         else:   
                             params[1] += T_matrix_x[current_model,proposed_model]
                             params[2] += T_matrix_y[current_model,proposed_model]
                         # Calculate log posterior with proposed value
+                        '''
                         proposed_log_prob = calc_posterior(*params)
     
                         # Log-acceptance rate
-                        alpha = (proposed_log_prob - current_log_prob)# + np.log(T_matrix_x_scale[current_model,proposed_model]) + np.log(T_matrix_x_scale[current_model,proposed_model])
-                        
+                        alpha = (proposed_log_prob - current_log_prob) + np.log(T_matrix_x_scale_1[current_model,proposed_model]) + np.log(T_matrix_y_scale_1[current_model,proposed_model])
+                        #alpha = (proposed_log_prob - current_log_prob) + np.log(T_matrix_x_scale_2[current_model,proposed_model]) + np.log(T_matrix_y_scale_2[current_model,proposed_model])
                         urv = runif()
     
                         # Test proposed value
@@ -249,7 +295,7 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
     return trace, trace[tune_for:], logp_trace, logp_trace[tune_for:],accept_prod, model_swaps, model_swap_attempts
 
 # Set the number of iterations to run RJMC and how long to tune for
-n_iter = 20000 # 20000 appears to be sufficient
+n_iter = 50000 # 20000 appears to be sufficient
 tune_for = 10000 #10000 appears to be sufficient
 guess_0=[0,0.5,0.5]
 guess_var=[1,0.1,0.1]

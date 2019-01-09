@@ -32,12 +32,16 @@ import random as rm
 
 # Define probabilities for both regions
 
-def test_pdf(model,x,y):
+
+cov_matrix_0=[[1,0],[0,1]]
+cov_matrix_1=[[1,0],[0,1]]
+
+def test_pdf(model,x,y,cov_matrix_0,cov_matrix_1):
     if model == 0:
-        rv=mvn([-1,-1])#,[[1.0,1.0],[1.0,1.0]])
+        rv=mvn([10,2],cov_matrix_0)
         f=rv.pdf([x,y])
     if model == 1:
-        rv=mvn([1,1])#,[[1.0,1.0],[1.0,1.0]])
+        rv=mvn([2,10],cov_matrix_1)
         f=rv.pdf([x,y])   
     return f
 
@@ -55,37 +59,47 @@ def calc_posterior(model,x,y):
     logp = 0
     logp += duni(x, -20, 40)
     logp += duni(y, -20, 40) 
-    prop_density=test_pdf(model,x,y)
+    prop_density=test_pdf(model,x,y,cov_matrix_0,cov_matrix_1)
     logp += np.log(prop_density)
     
     return logp
 
-
 def T_matrix_scale():
     T_matrix_x_scale=np.ones((2,2))
     T_matrix_y_scale=np.ones((2,2))
-    T_matrix_x_scale[0,1]=-1
-    T_matrix_y_scale[0,1]=-1
-    T_matrix_x_scale[1,0]=-1
-    T_matrix_y_scale[1,0]=-1
+    T_matrix_x_scale[0,1]=2/10
+    T_matrix_y_scale[0,1]=10/2
+    T_matrix_x_scale[1,0]=10/2
+    T_matrix_y_scale[1,0]=2/10
     return T_matrix_x_scale, T_matrix_y_scale
 
 
 def T_matrix_translation():
     T_matrix_x=np.zeros((2,2))
     T_matrix_y=np.zeros((2,2))
-    T_matrix_x[0,1]=2
-    T_matrix_y[0,1]=2
-    T_matrix_x[1,0]=-2
-    T_matrix_y[1,0]=-2
+    T_matrix_x[0,1]=-5
+    T_matrix_y[0,1]=-5
+    T_matrix_x[1,0]=5
+    T_matrix_y[1,0]=5
     return T_matrix_x, T_matrix_y
     
 T_matrix_x, T_matrix_y = T_matrix_translation()
 T_matrix_x_scale, T_matrix_y_scale = T_matrix_scale()
 
+'''
+def accept_reject(alpha,params):
+    
+    urv = runif()
+    
+    if np.log(urv) < alpha:
+    
+    # Accept
+    current_params = params
+    logp_trace_current = proposed_log_prob.copy()
+    current_log_prob = proposed_log_prob.copy()
 
-def accept_reject()
-
+def RJMC__outer_loop
+'''
 
 def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var, 
                      tune_for=None, tune_interval=1, map_scale='False'):
@@ -112,7 +126,7 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
                
     model_swaps = 0
     model_swap_attempts = 0
-    swap_freq = 1
+    swap_freq = 10
     swap_flag='False'
     # OCM: Currently attempting a model swap every single move, although this can be easily changed.  This is something that is not of critical importance now but will be important in the future.
     
@@ -163,7 +177,7 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
                         proposed_log_prob = calc_posterior(*params)
                         attempt_matrix[current_model,proposed_model]+=1
                         # Log-acceptance rate
-                        alpha = (proposed_log_prob - current_log_prob) + np.log(T_matrix_x_scale[current_model,proposed_model]) + np.log(T_matrix_x_scale[current_model,proposed_model])
+                        alpha = (proposed_log_prob - current_log_prob) + np.log(T_matrix_x_scale[current_model,proposed_model]) + np.log(T_matrix_y_scale[current_model,proposed_model])
                         
                         urv = runif()
     
@@ -246,9 +260,9 @@ def RJMC_tuned(calc_posterior,n_iterations, initial_values, prop_var,
 
 
 # Set the number of iterations to run RJMC and how long to tune for
-n_iter = 20000 # 20000 appears to be sufficient
+n_iter = 50000 # 20000 appears to be sufficient
 tune_for = 10000 #10000 appears to be sufficient
-guess_0=[0,-1,-1]
+guess_0=[0,5,5]
 guess_var=[1,1,1]
 trace_all,trace_tuned,logp_all,logp_tuned, acc_tuned, model_swaps, model_swap_attempts,acceptance_matrix,attempt_matrix = RJMC_tuned(calc_posterior, n_iter, guess_0, prop_var=guess_var, tune_for=tune_for,map_scale='True')
 #%%
@@ -288,8 +302,9 @@ for i in range(np.size(trace_all,0)):
 trace_model_0=np.asarray(trace_model_0)
 trace_model_1=np.asarray(trace_model_1)
 f = plt.figure()
-plt.scatter(trace_model_0[:,2],trace_model_0[:,1],s=1,label='Model 0',marker=',')
-plt.scatter(trace_model_1[:,2],trace_model_1[:,1],s=1,label='Model 1',marker=',')
+plt.scatter(trace_model_0[::10,2],trace_model_0[::10,1],s=1,label='Model 0',marker=',')
+plt.scatter(trace_model_1[::10,2],trace_model_1[::10,1],s=1,label='Model 1',marker=',')
+plt.title('RJMC between 2-D normals')
 plt.legend()
 plt.show()
 plt.plot(trace_all[:,0],label='Model Choice')

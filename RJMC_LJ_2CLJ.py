@@ -156,7 +156,7 @@ T_Psat_data = T_Psat_data[T_Psat_data<T_max]
 # Also, the transiton matrix for eps and sig for each model are tuned to this rhol uncertainty.
 # I.e. the optimal "lit" values agree well with a 3% uncertainty in rhol. This improved the RJMC model swap acceptance.
 pu_rhol = 3
-pu_Psat = 5
+pu_Psat = 20
 
 # I decided to include the same error model I am using for Mie lambda-6
 # For pu_rhol_low = 0.3 and pu_rhol_high = 0.5 AUA is 100%
@@ -189,9 +189,9 @@ t_Psat = np.sqrt(1./sd_Psat)
 guess_0 = (0,eps_lit_LJ, sig_lit_LJ) # Can use critical constants
 guess_1 = (1,eps_lit_UA,sig_lit_UA)
 guess_2 = (2,eps_lit_AUA,sig_lit_AUA)
-guess_3 = (2,eps_lit2_AUA,sig_lit2_AUA)
-guess_4 = (2,eps_lit3_AUA,sig_lit3_AUA)
-guess_5 = (2,eps_lit_AUA,sig_lit_AUA)
+guess_3 = (3,eps_lit2_AUA,sig_lit2_AUA)
+guess_4 = (4,eps_lit3_AUA,sig_lit3_AUA)
+guess_5 = (5,eps_lit_AUA,sig_lit_AUA)
 
 ## These transition matrices are designed for when rhol is the only target property
 #
@@ -254,7 +254,7 @@ duni = distributions.uniform.logpdf
 rnorm = np.random.normal
 runif = np.random.rand
 
-properties = 'rhol'
+properties = 'Psat'
 
 def calc_posterior(model,eps, sig):
 
@@ -262,7 +262,7 @@ def calc_posterior(model,eps, sig):
 #    print(eps,sig)
     # Using noninformative priors
     logp += duni(sig, 0, 1)
-    logp += duni(eps, 0,1000) 
+    logp += duni(eps, 0,500) 
     # OCM: no reason to use anything but uniform priors at this point.  Could probably narrow the prior ranges a little bit to improve acceptance,
     #But Rich is rightly being conservative here especially since evaluations are cheap.
     
@@ -298,9 +298,9 @@ def gen_Tmatrix():
     guess_AUA = [guess_2[1],guess_2[2]]
     
     # Make sure bounds are in a reasonable range so that models behave properly
-    bnd_LJ = ((0.95*guess_0[1],guess_0[1]*1.05),(0.99*guess_0[2],guess_0[2]*1.01))
-    bnd_UA = ((0.95*guess_1[1],guess_1[1]*1.05),(0.99*guess_1[2],guess_1[2]*1.01))
-    bnd_AUA = ((0.95*guess_2[1],guess_2[1]*1.05),(0.99*guess_2[2],guess_2[2]*1.01))
+    bnd_LJ = ((0.75*guess_0[1],guess_0[1]*1.25),(0.90*guess_0[2],guess_0[2]*1.1))
+    bnd_UA = ((0.75*guess_1[1],guess_1[1]*1.25),(0.90*guess_1[2],guess_1[2]*1.1))
+    bnd_AUA = ((0.75*guess_2[1],guess_2[1]*1.25),(0.90*guess_2[2],guess_2[2]*1.1))
     
     #Help debug
 #    print(bnd_LJ)
@@ -342,9 +342,9 @@ def gen_Tmatrix():
     Tmatrix_sig[2,0] = sig_opt_LJ/sig_opt_AUA
     Tmatrix_sig[2,1] = sig_opt_UA/sig_opt_AUA 
                
-    return Tmatrix_eps, Tmatrix_sig
+    return Tmatrix_eps, Tmatrix_sig, eps_opt_LJ,eps_opt_UA,eps_opt_AUA,sig_opt_LJ,sig_opt_UA,sig_opt_AUA
 
-Tmatrix_eps, Tmatrix_sig = gen_Tmatrix()
+Tmatrix_eps, Tmatrix_sig, eps_opt_LJ,eps_opt_UA,eps_opt_AUA,sig_opt_LJ,sig_opt_UA,sig_opt_AUA = gen_Tmatrix()
 
 ### Performs a 2-dimensional scan and integration of parameter space
 
@@ -613,8 +613,7 @@ def model_proposal(current_model,n_models,params,T_matrix_1,T_matrix_2):
     rjmc_jacobian =  np.log(T_matrix_1[current_model,proposed_model]) + np.log(T_matrix_2[current_model,proposed_model])
     return params,rjmc_jacobian,proposed_log_prob, proposed_model
     #Switch models and map parameters to new distributions
-    
-    
+        
     
 def parameter_proposal(params,n_params,prop_sd):
     proposed_param=int(np.ceil(np.random.random()*(n_params-1)))
@@ -641,7 +640,7 @@ def proposal_tuning(prop_sd,accept_vector,attempt_vector,n_params):
         
 initial_values=(0,eps_lit_LJ, sig_lit_LJ) # Can use critical constants
 initial_sd = [1,20, 0.05]
-n_iter=200000
+n_iter=50000
 tune_freq=100
 tune_for=20000
 n_models=3
@@ -778,7 +777,7 @@ plt.yticks([])
 plt.show()
 f.savefig(compound+"_Trajectory_RJMC.pdf")  
 #%%%
-'''
+
 T_plot_deltaHv = np.linspace(T_deltaHv.min(), T_deltaHv.max())
 T_plot_rhol = np.linspace(T_rhol_data.min(), T_rhol_data.max())
 T_plot_Psat = np.linspace(T_Psat_data.min(), T_Psat_data.max())
@@ -835,6 +834,7 @@ plt.tight_layout(pad=0.2)
 plt.show()
 f.savefig(compound+"_Prop_RJMC.pdf")
 #%%
+'''
 trace_0=[]
 trace_1=[]
 trace_2=[]
