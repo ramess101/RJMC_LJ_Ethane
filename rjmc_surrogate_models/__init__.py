@@ -1,5 +1,5 @@
 """
-rjmc-surrogate-models
+rjmc_surrogate_models
 RJMC sampling of L-J surrogate models
 """
 

@@ -1,5 +1,5 @@
 """
-rjmc-surrogate-models
+rjmc_surrogate_models
 RJMC sampling of L-J surrogate models
 """
 from setuptools import setup
@@ -16,7 +16,7 @@ except:
 
 setup(
     # Self-descriptive entries which should always be present
-    name='rjmc-surrogate-models',
+    name='rjmc_surrogate_models',
     author='Owen Madin',
     description=short_description[0],
     long_description=long_description,
@@ -26,12 +26,12 @@ setup(
     license='BSD-3-Clause',
 
     # Which Python importable modules should be included when your package is installed
-    packages=['rjmc-surrogate-models', "rjmc-surrogate-models.tests"],
+    packages=['rjmc_surrogate_models', "rjmc_surrogate_models.tests"],
 
     # Optional include package data to ship with your package
     # Comment out this line to prevent the files from being packaged with your software
     # Extend/modify the list to include/exclude other items as need be
-    package_data={'rjmc-surrogate-models': ["data/*.dat"]
+    package_data={'rjmc_surrogate_models': ["data/*.dat"]
                   },
 
     # Additional entries you may want simply uncomment the lines you want and fill in the data
