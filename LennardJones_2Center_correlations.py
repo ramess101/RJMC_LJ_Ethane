@@ -169,5 +169,11 @@ class LennardJones_2C():
         ST_star = self.ST_star_hat_2CLJQ(T_star,Q2_star,L_star)
         ST = ST_star *  eps  / sig**2 * k_B * m2_to_nm2 #[J/m2] #note that eps is defined as eps/kB
         return ST
-    
+
+    def T_c_hat_2CLJQ(self,eps,sig,Lbond,Qpole):
+        Q2_star = Qpole**2/(eps*sig**5)
+        L_star = Lbond/sig
+        T_c_star = self.T_c_star_hat(Q2_star,L_star)
+        T_c = T_c_star * eps
+        return T_c 
     
