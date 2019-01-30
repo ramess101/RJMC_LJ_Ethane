@@ -254,7 +254,7 @@ duni = distributions.uniform.logpdf
 rnorm = np.random.normal
 runif = np.random.rand
 
-properties = 'Psat'
+properties = 'Multi'
 
 def calc_posterior(model,eps, sig):
 

@@ -21,6 +21,7 @@ from scipy.stats import linregress
 from scipy.optimize import minimize
 import random as rm
 from pymc3.stats import hpd
+from RJMC_auxiliary_functions import *
 # Here we have chosen ethane as the test case
 compound="ethane"
 fname = compound+".yaml"
@@ -100,19 +101,24 @@ Psat_data = data[:,1] #[kJ/mol]
 
 # Limit temperature range to that which is typical of ITIC MD simulations
 
-T_min = 137
-T_max = 260
+T_min = 167.9
+T_max = 290.1
 
 rhol_data = rhol_data[T_rhol_data>T_min]
 T_rhol_data = T_rhol_data[T_rhol_data>T_min]
 rhol_data = rhol_data[T_rhol_data<T_max]
 T_rhol_data = T_rhol_data[T_rhol_data<T_max]
 
+rhol_data = rhol_data[::5]
+T_rhol_data = T_rhol_data[::5]
+
 Psat_data = Psat_data[T_Psat_data>T_min]
 T_Psat_data = T_Psat_data[T_Psat_data>T_min]
 Psat_data = Psat_data[T_Psat_data<T_max]
 T_Psat_data = T_Psat_data[T_Psat_data<T_max]
 
+Psat_data = Psat_data[::7]
+T_Psat_data = T_Psat_data[::7]
 # Set percent uncertainty in each property
 # These values are to represent the simulation uncertainty more than the experimental uncertainty
 # Also, the transiton matrix for eps and sig for each model are tuned to this rhol uncertainty.
@@ -200,7 +206,7 @@ runif = np.random.rand
 norm=distributions.norm.pdf
 unif=distributions.uniform.pdf
 
-properties = 'rhol'
+properties = 'Multi'
 
 def calc_posterior(model,eps,sig,L,Q):
 
@@ -216,7 +222,7 @@ def calc_posterior(model,eps,sig,L,Q):
     
     if model == 1:
         logp+=duni(Q,0,2)
-        logp+=duni(L,0,1)
+        logp+=duni(L,0,0.5)
     # OCM: no reason to use anything but uniform priors at this point.  Could probably narrow the prior ranges a little bit to improve acceptance,
     #But Rich is rightly being conservative here especially since evaluations are cheap.
     
@@ -313,6 +319,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     # Initialize trace for parameters
     trace = np.zeros((n_iterations+1, n_params)) #n_iterations + 1 to account for guess
     logp_trace = np.zeros(n_iterations+1)
+    percent_deviation_trace = np.zeros((n_iterations+1,2))
     # Set initial values
     trace[0] = initial_values
     
@@ -320,6 +327,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     current_log_prob = calc_posterior(*trace[0])
     
     logp_trace[0] = current_log_prob
+    percent_deviation_trace[0]=computePercentDeviations(T_rhol_data,T_Psat_data,initial_values,rhol_data,Psat_data)
     current_params=trace[0].copy()
     record_acceptance='False'
     #----------------------------------------------------------------------------------------#
@@ -327,7 +335,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     #OUTER MCMC LOOP
     
     for i in range(n_iterations):
-        if not i%5000: print('Iteration '+str(i))
+        if not i%50000: print('Iteration '+str(i))
         
         
         # Grab current parameter values
@@ -344,6 +352,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
             accept_vector[i]=1
         logp_trace[i+1] = new_log_prob
         trace[i+1] = new_params
+        percent_deviation_trace[i+1]=computePercentDeviations(T_rhol_data,T_Psat_data,trace[i+1],rhol_data,Psat_data)
         
         if (not (i+1) % tune_freq) and (i < tune_for):
         
@@ -360,7 +369,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
                     print('No')         
            
             
-    return trace,logp_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector
+    return trace,logp_trace, percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector
 
 
 def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix,jacobian,transition_function,record_acceptance,AUA_opt_params,AUA_Q_opt_params):
@@ -485,7 +494,7 @@ n_models=2
 
 def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
     swap_freq=0.0
-    n_iter=2000000
+    n_iter=200000
     tune_freq=100
     tune_for=10000
     parameter_prior_proposal=np.empty((n_models,np.size(guess_params,1),2))
@@ -493,7 +502,7 @@ def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
     for i in range(1,n_models):
         initial_values=guess_params[i,:]
         initial_sd=guess_sd[i,:]
-        trace,logp_trace,attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,1,1,1,1)
+        trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,1,1,1,1)
         trace_tuned = trace[tune_for:]
         max_ap=np.zeros(np.size(trace_tuned,1))
         map_CI=np.zeros((np.size(trace_tuned,1),2))
@@ -516,9 +525,9 @@ def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
 
 
 
-parameter_prior_proposals,trace_tuned=mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd)
+#parameter_prior_proposals,trace_tuned=mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd)
 
-def calc_posterior_refined(model,eps,sig,Q):
+def calc_posterior_refined(model,eps,sig,L,Q):
 
     logp = 0
 #    print(eps,sig)
@@ -527,21 +536,22 @@ def calc_posterior_refined(model,eps,sig,Q):
     
     if model == 0:
         Q=0
-        logp += duni(eps,*parameter_prior_proposals[0,1])
-        logp += duni(sig,*parameter_prior_proposals[0,2])
+        logp += dnorm(eps,*parameter_prior_proposals[0,1])
+        logp += dnorm(sig,*parameter_prior_proposals[0,2])
     
     
     if model == 1:
-        logp += duni(eps,*parameter_prior_proposals[1,1])
-        logp += duni(sig,*parameter_prior_proposals[1,2])
-        logp += duni(Q,*parameter_prior_proposals[1,3])
+        logp += dnorm(eps,*parameter_prior_proposals[1,1])
+        logp += dnorm(sig,*parameter_prior_proposals[1,2])
+        logp += dnorm(L,*parameter_prior_proposals[1,3])
+        logp += dnorm(Q,*parameter_prior_proposals[1,4])
     # OCM: no reason to use anything but uniform priors at this point.  Could probably narrow the prior ranges a little bit to improve acceptance,
     #But Rich is rightly being conservative here especially since evaluations are cheap.
     
 #    print(eps,sig)
     #rhol_hat_fake = rhol_hat_models(T_lin,model,eps,sig)
-    rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig,Q) #[kg/m3]
-    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig,Q) #[kPa]        
+    rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig,L,Q) #[kg/m3]
+    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig,L,Q) #[kPa]        
  
     # Data likelihood
     if properties == 'rhol':
@@ -556,14 +566,14 @@ def calc_posterior_refined(model,eps,sig,Q):
     #return rhol_hat
 
 initial_values=guess_1 # Can use critical constants
-initial_sd = [1,2, 0.005,0.01]
+initial_sd = [1,2, 0.01,0.01,0.1]
 n_iter=1000000
 tune_freq=100
 tune_for=10000
 n_models=2
-swap_freq=0.01
+swap_freq=0.0
 #The fraction of times a model swap is suggested as the move, rather than an intra-model move
-#trace,logp_trace,attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior_refined,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params)
+trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params)
 
 
 #def MCMC_priors(RJMC_outerloop)
@@ -585,7 +595,23 @@ transition_matrix[1,1]=1-prob_matrix[1,0]
 print('Transition Matrix:')
 print(transition_matrix)
 trace_tuned = trace[tune_for:]
-model_params = trace_tuned[:,0]
+model_params = trace_tuned[0,:]
+
+pareto_point,pareto_point_values=findParetoPoints(percent_deviation_trace,trace)
+
+max_ap = np.zeros(np.size(model_params))
+map_CI = np.zeros((np.size(model_params),2))
+for i in range(np.size(model_params)):
+    bins,values=np.histogram(trace_tuned[:,i],bins=100,density=True)
+    max_ap[i]=(values[np.argmax(bins)+1]+values[np.argmax(bins)])/2
+    map_CI[i]=hpd(trace_tuned[:,i],alpha=0.05)
+    plt.hist(trace_tuned[:,i],bins=100,label='Sampled Posterior',density='True'),plt.axvline(x=map_CI[i][0],color='red',label='HPD 95% CI',ls='--'),plt.axvline(x=map_CI[i][1],color='red',ls='--'),plt.axvline(x=pareto_point_values[i],color='black',lw=1,label='Pareto Point'),plt.axvline(x=max_ap[i],color='orange',lw=1,label='MAP Estimate')
+    plt.axvline(x=initial_values[i],color='magenta',label='Literature/Initial Value')
+    plt.legend()
+    plt.show()
+max_ap[0]=np.floor(max_ap[0])
+plotPercentDeviations(percent_deviation_trace,pareto_point,'MCMC Points','Pareto Point')
+plotDeviationHistogram(percent_deviation_trace,pareto_point)
 
 # Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
 model_count = np.array([len(model_params[model_params==0]),len(model_params[model_params==1])])
