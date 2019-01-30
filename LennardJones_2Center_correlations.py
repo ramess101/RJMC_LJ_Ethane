@@ -10,6 +10,7 @@ import scipy as sp
 k_B = 1.38065e-23 #[J/K]
 N_A = 6.02214e23 #[1/mol]
 m3_to_nm3 = 1e27
+m2_to_nm2 = 1e18
 gm_to_kg = 1./1000
 J_to_kJ = 1./1000
 J_per_m3_to_kPA = 1./1000
@@ -32,6 +33,12 @@ class LennardJones_2C():
         self.b_c1 = np.array(yfile["correlation_parameters"]["Stoll"]["P_v_star_params"]["c1_params"])
         self.b_c2 = np.array(yfile["correlation_parameters"]["Stoll"]["P_v_star_params"]["c2_params"])
         self.b_c3 = np.array(yfile["correlation_parameters"]["Stoll"]["P_v_star_params"]["c3_params"])
+        self.A_a = np.array(yfile["correlation_parameters"]["Werth"]["A_star_params"]["a_params"])
+        self.A_b = np.array(yfile["correlation_parameters"]["Werth"]["A_star_params"]["b_params"])
+        self.A_c = np.array(yfile["correlation_parameters"]["Werth"]["A_star_params"]["c_params"])
+        self.A_d = np.array(yfile["correlation_parameters"]["Werth"]["A_star_params"]["d_params"])
+        self.A_e = np.array(yfile["correlation_parameters"]["Werth"]["A_star_params"]["e_params"])
+        self.B = np.array(yfile["correlation_parameters"]["Werth"]["A_star_params"]["B_params"])
     
     def T_c_star_hat(self,q,l):
         b=self.T_c_star_params
@@ -95,7 +102,7 @@ class LennardJones_2C():
     
     def rho_hat_2CLJQ(self,Temp,eps,sig,Lbond,Qpole,phase):
         M_w = self.M_w
-        T_star = Temp/eps
+        T_star = Temp/eps #note that eps is defined as eps/kB
         Q2_star = Qpole**2/(eps*sig**5)
         L_star = Lbond/sig
         rho_star = self.rho_star_hat_2CLJQ(T_star,Q2_star,L_star,phase)
@@ -122,14 +129,45 @@ class LennardJones_2C():
         return Psat_star
     
     def Psat_hat_2CLJQ(self,Temp,eps,sig,Lbond,Qpole):
-        T_star = Temp/eps
-        Q2_star = Qpole**2/(eps*sig**5)
+        T_star = Temp/eps #note that eps is defined as eps/kB
+        Q2_star = Qpole**2/(eps*sig**5) #note that eps is defined as eps/kB
         L_star = Lbond/sig
         Psat_star = self.Psat_star_hat_2CLJQ(T_star,Q2_star,L_star)
-        Psat = Psat_star *  eps  / sig**3 * k_B * m3_to_nm3 * J_per_m3_to_kPA #[kPa]
+        Psat = Psat_star *  eps  / sig**3 * k_B * m3_to_nm3 * J_per_m3_to_kPA #[kPa] #note that eps is defined as eps/kB
         return Psat
     
     def LJ_model(self,r,eps,sig):
         r_star = r/sig
         U = 4 * eps * (r_star**(-12) - r_star**(-6))
         return U
+    
+    def Astar_hat(self,q,l):
+        a, b, c, d, e = self.A_a, self.A_b, self.A_c, self.A_d, self.A_e
+        x_a = np.array([1])
+        x_b = np.array([q,q**2.,q**3.])
+        x_c = np.array([1./(l**2. + 0.1)])
+        x_d = np.array([q**2.*l**2.,q**2.*l**3.])
+        x_e = np.array([q**2/(l**2. + 0.1),q**2./(l**5. + 0.1)])
+        Astar = (x_a * a).sum()
+        Astar += (x_b * b).sum()
+        Astar += (x_c * c).sum()
+        Astar += (x_d * d).sum()
+        Astar += (x_e * e).sum()
+        return Astar
+    
+    def ST_star_hat_2CLJQ(self,T_star,q,l):
+        B = self.B
+        T_c_star = self.T_c_star_hat(q,l)
+        Astar = self.Astar_hat(q,l)
+        ST_star = Astar * (1. - (T_star/T_c_star))**B
+        return ST_star
+        
+    def ST_hat_2CLJQ(self,Temp,eps,sig,Lbond,Qpole):
+        T_star = Temp/eps #note that eps is defined as eps/kB
+        Q2_star = Qpole**2/(eps*sig**5) #note that eps is defined as eps/kB
+        L_star = Lbond/sig
+        ST_star = self.ST_star_hat_2CLJQ(T_star,Q2_star,L_star)
+        ST = ST_star *  eps  / sig**2 * k_B * m2_to_nm2 #[J/m2] #note that eps is defined as eps/kB
+        return ST
+    
+    
