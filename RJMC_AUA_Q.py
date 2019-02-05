@@ -77,13 +77,37 @@ def Psat_hat_models(Temp,model,eps,sig,L,Q):
     
     if model == 0: #Two center AUA LJ
     
-        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,Q) 
+        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,0) 
         
     elif model == 1: #Two center AUA LJ+Q
     
         Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,Q) 
         
     return Psat_hat #[kPa]       
+
+def SurfTens_hat_models(Temp,model,eps,sig,L,Q):
+    
+    if model == 0:
+        
+        SurfTens_hat=Ethane_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,0)
+        
+    elif model == 1:
+        
+        SurfTens_hat=Ethane_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,Q)
+        
+    return SurfTens_hat
+
+def T_c_hat_models(model,eps,sig,L,Q):
+    
+    if model == 0: 
+        
+        T_c_hat=Ethane_2CLJ.T_c_hat_2CLJQ(eps,sig,L,0)
+    
+    elif model == 1: 
+        
+        T_c_hat=Ethane_2CLJ.T_c_hat_2CLJQ(eps,sig,L,Q)
+        
+    return T_c_hat
 
 
 # Load REFPROP data from file so that user does not need REFPROP
@@ -99,6 +123,11 @@ data = np.loadtxt('TRC_data_Pv.txt')
 T_Psat_data = data[:,0] #[K]
 Psat_data = data[:,1] #[kJ/mol]
 
+data = np.loadtxt('TRC_data_SurfTens.txt')
+T_SurfTens_data = data[:,0]
+SurfTens_data = data[:,1]
+u_SurfTens = data[:,2]
+
 # Limit temperature range to that which is typical of ITIC MD simulations
 
 T_min = 167.9
@@ -109,16 +138,30 @@ T_rhol_data = T_rhol_data[T_rhol_data>T_min]
 rhol_data = rhol_data[T_rhol_data<T_max]
 T_rhol_data = T_rhol_data[T_rhol_data<T_max]
 
-rhol_data = rhol_data[::5]
-T_rhol_data = T_rhol_data[::5]
+rhol_data = rhol_data[::15]
+T_rhol_data = T_rhol_data[::15]
 
 Psat_data = Psat_data[T_Psat_data>T_min]
 T_Psat_data = T_Psat_data[T_Psat_data>T_min]
 Psat_data = Psat_data[T_Psat_data<T_max]
 T_Psat_data = T_Psat_data[T_Psat_data<T_max]
 
-Psat_data = Psat_data[::7]
-T_Psat_data = T_Psat_data[::7]
+Psat_data = Psat_data[::50]
+T_Psat_data = T_Psat_data[::50]
+
+SurfTens_data = SurfTens_data[T_SurfTens_data>T_min]
+u_SurfTens = u_SurfTens[T_SurfTens_data>T_min]
+T_SurfTens_data = T_SurfTens_data[T_SurfTens_data>T_min]
+
+SurfTens_data = SurfTens_data[T_SurfTens_data<T_max]
+u_SurfTens = u_SurfTens[T_SurfTens_data<T_max]
+T_SurfTens_data = T_SurfTens_data[T_SurfTens_data<T_max]
+
+
+SurfTens_data = SurfTens_data[::4]
+T_SurfTens_data = T_SurfTens_data[::4]
+u_SurfTens = u_SurfTens[::4]
+
 # Set percent uncertainty in each property
 # These values are to represent the simulation uncertainty more than the experimental uncertainty
 # Also, the transiton matrix for eps and sig for each model are tuned to this rhol uncertainty.
@@ -148,15 +191,18 @@ u_Psat = Psat_data*pu_Psat/100.
 # Calculate the estimated standard deviation
 sd_rhol = u_rhol/2.
 sd_Psat = u_Psat/2.
+sd_SurfTens = u_SurfTens
 
 # Calculate the precision in each property
 t_rhol = np.sqrt(1./sd_rhol)
 t_Psat = np.sqrt(1./sd_Psat)                                   
+t_SurfTens = np.sqrt(1./sd_SurfTens)                                   
 
 # Initial values for the Markov Chain
 
 guess_0 = [0,eps_lit_AUA,sig_lit_AUA,Lbond_lit_AUA,0]
 guess_1 = [1,eps_lit2_AUA,sig_lit2_AUA,Lbond_lit2_AUA,Q_lit2_AUA]
+guess_2 = [1,eps_lit3_AUA,sig_lit3_AUA,Lbond_lit3_AUA,Q_lit3_AUA]
 
 ## These transition matrices are designed for when rhol is the only target property
 #
@@ -206,7 +252,7 @@ runif = np.random.rand
 norm=distributions.norm.pdf
 unif=distributions.uniform.pdf
 
-properties = 'Multi'
+properties = 'rhol+Psat'
 
 def calc_posterior(model,eps,sig,L,Q):
 
@@ -214,22 +260,25 @@ def calc_posterior(model,eps,sig,L,Q):
 #    print(eps,sig)
     # Using noninformative priors
     logp += duni(sig, 0.2, 0.5)
-    logp += duni(eps, 100,200) 
-    
+    logp += duni(eps, 0,200) 
+    logp+=duni(L,0,0.5)
+    #logp+=duni(Q,0,2)
     if model == 0:
         Q=0
     
     
     if model == 1:
         logp+=duni(Q,0,2)
-        logp+=duni(L,0,0.5)
+        pass
+        
     # OCM: no reason to use anything but uniform priors at this point.  Could probably narrow the prior ranges a little bit to improve acceptance,
     #But Rich is rightly being conservative here especially since evaluations are cheap.
     
 #    print(eps,sig)
     #rhol_hat_fake = rhol_hat_models(T_lin,model,eps,sig)
     rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig,L,Q) #[kg/m3]
-    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig,L,Q) #[kPa]        
+    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig,L,Q) #[kPa]   
+    SurfTens_hat = SurfTens_hat_models(T_SurfTens_data,model,eps,sig,L,Q)     
  
     # Data likelihood
     if properties == 'rhol':
@@ -237,9 +286,13 @@ def calc_posterior(model,eps,sig,L,Q):
         #logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
     elif properties == 'Psat':
         logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
-    elif properties == 'Multi':
+    elif properties == 'rhol+Psat':
         logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
         logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
+    elif properties == 'All':
+         logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
+         logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))           
+         logp += sum(dnorm(SurfTens_data,SurfTens_hat,t_SurfTens**-2))
     return logp
     #return rhol_hat
     
@@ -248,8 +301,8 @@ def calc_posterior(model,eps,sig,L,Q):
 
 def jacobian(n_models,n_params,w,lamda,AUA_opt_params,AUA_Q_opt_params):
     jacobian=np.ones((n_models,n_models))
-    jacobian[0,1]=(1/(lamda*w))*(AUA_Q_opt_params[0]*AUA_Q_opt_params[1])/(AUA_opt_params[0]*AUA_opt_params[1])
-    jacobian[1,0]=w*lamda*(AUA_opt_params[0]*AUA_opt_params[1])/(AUA_Q_opt_params[0]*AUA_Q_opt_params[1])
+    #jacobian[0,1]=(1/(lamda*w))*(AUA_Q_opt_params[0]*AUA_Q_opt_params[1])/(AUA_opt_params[0]*AUA_opt_params[1])
+    #jacobian[1,0]=w*lamda*(AUA_opt_params[0]*AUA_opt_params[1])/(AUA_Q_opt_params[0]*AUA_Q_opt_params[1])
     #jacobian[0,1]=1/(lamda*w)
     #jacobian[1,0]=w*lamda
     return jacobian
@@ -319,7 +372,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     # Initialize trace for parameters
     trace = np.zeros((n_iterations+1, n_params)) #n_iterations + 1 to account for guess
     logp_trace = np.zeros(n_iterations+1)
-    percent_deviation_trace = np.zeros((n_iterations+1,2))
+    percent_deviation_trace = np.zeros((n_iterations+1,4))
     # Set initial values
     trace[0] = initial_values
     
@@ -327,7 +380,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     current_log_prob = calc_posterior(*trace[0])
     
     logp_trace[0] = current_log_prob
-    percent_deviation_trace[0]=computePercentDeviations(T_rhol_data,T_Psat_data,initial_values,rhol_data,Psat_data)
+    percent_deviation_trace[0]=computePercentDeviations(T_rhol_data,T_Psat_data,T_SurfTens_data,initial_values,rhol_data,Psat_data,SurfTens_data,Tc_RP)
     current_params=trace[0].copy()
     record_acceptance='False'
     #----------------------------------------------------------------------------------------#
@@ -352,7 +405,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
             accept_vector[i]=1
         logp_trace[i+1] = new_log_prob
         trace[i+1] = new_params
-        percent_deviation_trace[i+1]=computePercentDeviations(T_rhol_data,T_Psat_data,trace[i+1],rhol_data,Psat_data)
+        percent_deviation_trace[i+1]=computePercentDeviations(T_rhol_data,T_Psat_data,T_SurfTens_data,trace[i+1],rhol_data,Psat_data,SurfTens_data,Tc_RP)
         
         if (not (i+1) % tune_freq) and (i < tune_for):
         
@@ -445,24 +498,26 @@ def model_proposal(current_model,n_models,n_params,params,jacobian,transition_fu
     while proposed_model==current_model:
         proposed_model=int(np.floor(np.random.random()*n_models))
         
-    lamda=2    
+    lamda=5    
     params[0] = proposed_model
     if proposed_model==1:
         
-        params[1] = (AUA_Q_opt_params[0]/AUA_opt_params[0])*params[1]
-        params[2] = (AUA_Q_opt_params[1]/AUA_opt_params[1])*params[2]
+        #params[1] = (AUA_Q_opt_params[0]/AUA_opt_params[0])*params[1]
+        #params[2] = (AUA_Q_opt_params[1]/AUA_opt_params[1])*params[2]
+        #params[3] = (AUA_Q_opt_params[2]/AUA_opt_params[2])*params[3]
         w=runif()
         
         #THIS IS IMPORTANT needs to be different depending on which direction
         
         
-        params[3] = -(1/lamda)*np.log(w)
+        params[4] = -(1/lamda)*np.log(w)
 
     if proposed_model==0:
-        params[1] = (AUA_opt_params[0]/AUA_Q_opt_params[0])*params[1]
-        params[2] = (AUA_opt_params[1]/AUA_Q_opt_params[1])*params[2]
-        w=np.exp(-lamda*params[3])
-        params[3]=0
+        #params[1] = (AUA_opt_params[0]/AUA_Q_opt_params[0])*params[1]
+        #params[2] = (AUA_opt_params[1]/AUA_Q_opt_params[1])*params[2]
+        #params[3] = (AUA_opt_params[2]/AUA_Q_opt_params[2])*params[3]
+        w=np.exp(-lamda*params[4])
+        params[4]=0
         
 
     proposed_log_prob=calc_posterior(*params)
@@ -478,9 +533,8 @@ def parameter_proposal(params,n_params,prop_sd):
     params[proposed_param] = rnorm(params[proposed_param], prop_sd[proposed_param])
     proposed_log_prob=calc_posterior(*params)
     if params[0]==0:
-        params[3]=0
+        params[4]=0
     return params, proposed_log_prob
-
 
 guess_params=np.zeros((2,np.size(guess_0)))
 guess_params[0,:]=guess_0
@@ -494,7 +548,7 @@ n_models=2
 
 def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
     swap_freq=0.0
-    n_iter=200000
+    n_iter=100000
     tune_freq=100
     tune_for=10000
     parameter_prior_proposal=np.empty((n_models,np.size(guess_params,1),2))
@@ -566,7 +620,7 @@ def calc_posterior_refined(model,eps,sig,L,Q):
     #return rhol_hat
 
 initial_values=guess_1 # Can use critical constants
-initial_sd = [1,2, 0.01,0.01,0.1]
+initial_sd = np.asarray(initial_values)/100
 n_iter=1000000
 tune_freq=100
 tune_for=10000
@@ -586,18 +640,22 @@ print('Attempted Moves')
 print(attempt_matrix)
 print('Accepted Moves')
 print(acceptance_matrix)
-prob_matrix=acceptance_matrix/attempt_matrix
+#prob_matrix=acceptance_matrix/attempt_matrix
 transition_matrix=np.ones((2,2))
-transition_matrix[0,0]=1-prob_matrix[0,1]
-transition_matrix[0,1]=prob_matrix[0,1]
-transition_matrix[1,0]=prob_matrix[1,0]
-transition_matrix[1,1]=1-prob_matrix[1,0]
+transition_matrix[0,1]=acceptance_matrix[0,1]/np.sum(attempt_matrix,1)[0]
+transition_matrix[1,0]=acceptance_matrix[1,0]/np.sum(attempt_matrix,1)[1]
+transition_matrix[0,0]=1-transition_matrix[0,1]
+transition_matrix[1,1]=1-transition_matrix[1,0]
 print('Transition Matrix:')
 print(transition_matrix)
 trace_tuned = trace[tune_for:]
+percent_deviation_trace_tuned = percent_deviation_trace[tune_for:]
 model_params = trace_tuned[0,:]
 
-pareto_point,pareto_point_values=findParetoPoints(percent_deviation_trace,trace)
+
+
+
+pareto_point,pareto_point_values=findParetoPoints(percent_deviation_trace_tuned,trace_tuned,1.3)
 
 max_ap = np.zeros(np.size(model_params))
 map_CI = np.zeros((np.size(model_params),2))
@@ -605,16 +663,16 @@ for i in range(np.size(model_params)):
     bins,values=np.histogram(trace_tuned[:,i],bins=100,density=True)
     max_ap[i]=(values[np.argmax(bins)+1]+values[np.argmax(bins)])/2
     map_CI[i]=hpd(trace_tuned[:,i],alpha=0.05)
-    plt.hist(trace_tuned[:,i],bins=100,label='Sampled Posterior',density='True'),plt.axvline(x=map_CI[i][0],color='red',label='HPD 95% CI',ls='--'),plt.axvline(x=map_CI[i][1],color='red',ls='--'),plt.axvline(x=pareto_point_values[i],color='black',lw=1,label='Pareto Point'),plt.axvline(x=max_ap[i],color='orange',lw=1,label='MAP Estimate')
+    plt.hist(trace_tuned[:,i],bins=100,label='Sampled Posterior',density='True'),plt.axvline(x=map_CI[i][0],color='red',label='HPD 95% CI',ls='--'),plt.axvline(x=map_CI[i][1],color='red',ls='--'),plt.axvline(x=max_ap[i],color='orange',lw=1,label='MAP Estimate')
     plt.axvline(x=initial_values[i],color='magenta',label='Literature/Initial Value')
     plt.legend()
     plt.show()
 max_ap[0]=np.floor(max_ap[0])
-plotPercentDeviations(percent_deviation_trace,pareto_point,'MCMC Points','Pareto Point')
-plotDeviationHistogram(percent_deviation_trace,pareto_point)
+plotPercentDeviations(percent_deviation_trace_tuned,pareto_point,'MCMC Points','Pareto Point')
+plotDeviationHistogram(percent_deviation_trace_tuned,pareto_point)
 
 # Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
-model_count = np.array([len(model_params[model_params==0]),len(model_params[model_params==1])])
+model_count = np.array([len(trace_tuned[trace_tuned[:,0]==0]),len(trace_tuned[trace_tuned[:,0]==1])])
 
 
 prob_0 = 1.*model_count[0]/(n_iter-tune_for)
@@ -630,8 +688,8 @@ print('Experimental sampling ratio: %2.3f' % Exp_ratio )
 
 
 print('Detailed Balance')
-print(prob_0*prob_matrix[0,1])
-print(prob_1*prob_matrix[1,0])
+print(prob_0*transition_matrix[0,1])
+print(prob_1*transition_matrix[1,0])
     
 trace_model_0=[]
 trace_model_1=[]
@@ -650,8 +708,13 @@ for i in range(np.size(trace_tuned,0)):
         trace_model_1.append(trace_tuned[i])
         log_trace_1.append(logp_trace[i])
         
+        
+        
 trace_model_0=np.asarray(trace_model_0)
 trace_model_1=np.asarray(trace_model_1)
+
+#%%
+'''
 f = plt.figure()
 plt.scatter(trace_model_0[::10,1],trace_model_0[::10,2],s=1,label='AUA',marker=',',alpha=0.7)
 plt.scatter(trace_model_1[::10,1],trace_model_1[::10,2],s=1,label='AUA+Q',marker=',',alpha=0.7)
@@ -697,7 +760,7 @@ plt.legend()
 plt.show()
 
 
-'''
+
 map_x_0=hpd(trace_model_0[:,1],alpha=0.05)
 map_x_1=hpd(trace_model_1[:,1],alpha=0.05)
 map_y_0=hpd(trace_model_0[:,2],alpha=0.05)
