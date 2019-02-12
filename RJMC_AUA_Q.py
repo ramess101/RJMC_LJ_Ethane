@@ -22,145 +22,110 @@ from scipy.optimize import minimize
 import random as rm
 from pymc3.stats import hpd
 from RJMC_auxiliary_functions import *
+from datetime import date
+
+
 # Here we have chosen ethane as the test case
-compound="ethane"
-fname = compound+".yaml"
 
-# Load property values for compound
 
-with open(fname) as yfile:
-    yfile = yaml.load(yfile)
+compound='O2'
+ff_params_ref,Tc_lit,M_w,thermo_data=parse_data_ffs(compound)
+#Retrieve force field literature values, constants, and thermo data
 
-eps_lit_LJ = yfile["force_field_params"]["eps_lit_LJ"] #[K]
-sig_lit_LJ = yfile["force_field_params"]["sig_lit_LJ"] #[nm]
-eps_lit_UA = yfile["force_field_params"]["eps_lit_UA"] #[K]
-sig_lit_UA = yfile["force_field_params"]["sig_lit_UA"] #[nm]
-Lbond_lit_UA = yfile["force_field_params"]["Lbond_lit_UA"] #[nm]
-eps_lit_AUA = yfile["force_field_params"]["eps_lit_AUA"] #[K]
-sig_lit_AUA = yfile["force_field_params"]["sig_lit_AUA"] #[nm]
-Lbond_lit_AUA = yfile["force_field_params"]["Lbond_lit_AUA"] #[nm]
-eps_lit2_AUA = yfile["force_field_params"]["eps_lit2_AUA"] #[K]
-sig_lit2_AUA = yfile["force_field_params"]["sig_lit2_AUA"] #[nm]
-Lbond_lit2_AUA = yfile["force_field_params"]["Lbond_lit2_AUA"] #[nm]
-Q_lit2_AUA = yfile["force_field_params"]["Q_lit2_AUA"] #[DAng]
-eps_lit3_AUA = yfile["force_field_params"]["eps_lit3_AUA"] #[K]
-sig_lit3_AUA = yfile["force_field_params"]["sig_lit3_AUA"] #[nm]
-Lbond_lit3_AUA = yfile["force_field_params"]["Lbond_lit3_AUA"] #[nm]
-Q_lit3_AUA = yfile["force_field_params"]["Q_lit3_AUA"] #[DAng]
-Tc_RP = yfile["physical_constants"]["T_c"] #[K]
-rhoc_RP = yfile["physical_constants"]["rho_c"] #[kg/m3]
-M_w = yfile["physical_constants"]["M_w"] #[gm/mol]
+T_min = 0.55*Tc_lit[0]
+T_max = 0.95*Tc_lit[0]
+n_points=10
+
+
+thermo_data=filter_thermo_data(thermo_data,T_min,T_max,10)
+
+uncertainties=calculate_uncertainties(thermo_data,Tc_lit[0])
+
+
+# Limit temperature range to that which is typical of ITIC MD simulations
+thermo_data_rhoL=np.asarray(thermo_data['rhoL'])
+thermo_data_Pv=np.asarray(thermo_data['Pv'])
+thermo_data_SurfTens=np.asarray(thermo_data['SurfTens'])
 
 # Substantiate LennardJones class
-Ethane_LJ = LennardJones(M_w)
-Ethane_2CLJ = LennardJones_2C(M_w)
+#Ethane_LJ = LennardJones(M_w)
+compound_2CLJ = LennardJones_2C(M_w)
 
+
+'''
 # Epsilon and sigma can be obtained from the critical constants
-eps_Tc = Ethane_LJ.calc_eps_Tc(Tc_RP) #[K]
-sig_rhoc = Ethane_LJ.calc_sig_rhoc(rhoc_RP) #[nm]
+#eps_Tc = Ethane_LJ.calc_eps_Tc(Tc_RP) #[K]
+#sig_rhoc = Ethane_LJ.calc_sig_rhoc(rhoc_RP) #[nm]
+'''
+
 
 # Create functions that return properties for a given model, eps, sig
 
 def rhol_hat_models(Temp,model,eps,sig,L,Q):
-    
+    '''
+    L_nm=L/10
+    sig_nm=sig/10
+    Q_nm=Q/10
+    '''
     if model == 0: #Two center AUA LJ
     
-        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,0) 
+        rhol_hat = compound_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,0) 
         
     elif model == 1: #Two center AUA LJ+Q
     
-        rhol_hat = Ethane_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,Q) 
+        rhol_hat = compound_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,Q) 
         
     return rhol_hat #[kg/m3]       
   
 def Psat_hat_models(Temp,model,eps,sig,L,Q):
-    
+    '''
+    L_nm=L/10
+    sig_nm=sig/10
+    Q_nm=Q/10
+    '''
     if model == 0: #Two center AUA LJ
     
-        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,0) 
+        Psat_hat = compound_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,0) 
         
     elif model == 1: #Two center AUA LJ+Q
     
-        Psat_hat = Ethane_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,Q) 
+        Psat_hat = compound_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,Q) 
         
     return Psat_hat #[kPa]       
 
 def SurfTens_hat_models(Temp,model,eps,sig,L,Q):
-    
+    '''
+    L_nm=L/10
+    sig_nm=sig/10
+    Q_nm=Q/10
+    '''
     if model == 0:
         
-        SurfTens_hat=Ethane_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,0)
+        SurfTens_hat=compound_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,0)
         
     elif model == 1:
         
-        SurfTens_hat=Ethane_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,Q)
+        SurfTens_hat=compound_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,Q)
         
     return SurfTens_hat
 
 def T_c_hat_models(model,eps,sig,L,Q):
-    
+    '''
+    L_nm=L/10
+    sig_nm=sig/10
+    Q_nm=Q/10
+    '''
     if model == 0: 
         
-        T_c_hat=Ethane_2CLJ.T_c_hat_2CLJQ(eps,sig,L,0)
+        T_c_hat=compound_2CLJ.T_c_hat_2CLJQ(eps,sig,L,0)
     
     elif model == 1: 
         
-        T_c_hat=Ethane_2CLJ.T_c_hat_2CLJQ(eps,sig,L,Q)
+        T_c_hat=compound_2CLJ.T_c_hat_2CLJQ(eps,sig,L,Q)
         
     return T_c_hat
 
 
-# Load REFPROP data from file so that user does not need REFPROP
-data = np.loadtxt('TRC_deltaHv.txt')
-T_deltaHv = data[:,0] #[K]
-RP_deltaHv = data[:,1] #[kJ/mol]
-
-data = np.loadtxt('TRC_data_rhoL.txt')
-T_rhol_data = data[:,0] #[K]
-rhol_data = data[:,1] #[kJ/mol]
-
-data = np.loadtxt('TRC_data_Pv.txt')
-T_Psat_data = data[:,0] #[K]
-Psat_data = data[:,1] #[kJ/mol]
-
-data = np.loadtxt('TRC_data_SurfTens.txt')
-T_SurfTens_data = data[:,0]
-SurfTens_data = data[:,1]
-u_SurfTens = data[:,2]
-
-# Limit temperature range to that which is typical of ITIC MD simulations
-
-T_min = 167.9
-T_max = 290.1
-
-rhol_data = rhol_data[T_rhol_data>T_min]
-T_rhol_data = T_rhol_data[T_rhol_data>T_min]
-rhol_data = rhol_data[T_rhol_data<T_max]
-T_rhol_data = T_rhol_data[T_rhol_data<T_max]
-
-rhol_data = rhol_data[::15]
-T_rhol_data = T_rhol_data[::15]
-
-Psat_data = Psat_data[T_Psat_data>T_min]
-T_Psat_data = T_Psat_data[T_Psat_data>T_min]
-Psat_data = Psat_data[T_Psat_data<T_max]
-T_Psat_data = T_Psat_data[T_Psat_data<T_max]
-
-Psat_data = Psat_data[::50]
-T_Psat_data = T_Psat_data[::50]
-
-SurfTens_data = SurfTens_data[T_SurfTens_data>T_min]
-u_SurfTens = u_SurfTens[T_SurfTens_data>T_min]
-T_SurfTens_data = T_SurfTens_data[T_SurfTens_data>T_min]
-
-SurfTens_data = SurfTens_data[T_SurfTens_data<T_max]
-u_SurfTens = u_SurfTens[T_SurfTens_data<T_max]
-T_SurfTens_data = T_SurfTens_data[T_SurfTens_data<T_max]
-
-
-SurfTens_data = SurfTens_data[::4]
-T_SurfTens_data = T_SurfTens_data[::4]
-u_SurfTens = u_SurfTens[::4]
 
 # Set percent uncertainty in each property
 # These values are to represent the simulation uncertainty more than the experimental uncertainty
@@ -185,13 +150,13 @@ pu_Psat = 5
 #pu_Psat = np.piecewise(T_Psat_data,[T_Psat_data<T_Psat_switch,T_Psat_data>=T_Psat_switch],[lambda x:np.poly1d(np.polyfit([T_min,T_Psat_switch],[pu_Psat_low,pu_Psat_high],1))(x),pu_Psat_high])
   
 # Calculate the absolute uncertainty
-u_rhol = rhol_data*pu_rhol/100.
-u_Psat = Psat_data*pu_Psat/100.
+#u_rhol = rhol_data*pu_rhol/100.
+#u_Psat = Psat_data*pu_Psat/100.
    
 # Calculate the estimated standard deviation
-sd_rhol = u_rhol/2.
-sd_Psat = u_Psat/2.
-sd_SurfTens = u_SurfTens
+sd_rhol = uncertainties['rhoL']/2.
+sd_Psat = uncertainties['Pv']/2.
+sd_SurfTens = uncertainties['SurfTens']/2
 
 # Calculate the precision in each property
 t_rhol = np.sqrt(1./sd_rhol)
@@ -200,45 +165,9 @@ t_SurfTens = np.sqrt(1./sd_SurfTens)
 
 # Initial values for the Markov Chain
 
-guess_0 = [0,eps_lit_AUA,sig_lit_AUA,Lbond_lit_AUA,0]
-guess_1 = [1,eps_lit2_AUA,sig_lit2_AUA,Lbond_lit2_AUA,Q_lit2_AUA]
-guess_2 = [1,eps_lit3_AUA,sig_lit3_AUA,Lbond_lit3_AUA,Q_lit3_AUA]
-
-## These transition matrices are designed for when rhol is the only target property
-#
-#Tmatrix_eps = np.ones([3,3])
-#Tmatrix_eps[0,1] = eps_lit_UA/eps_lit_LJ
-#Tmatrix_eps[0,2] = eps_lit_AUA/eps_lit_LJ
-#Tmatrix_eps[1,0] = eps_lit_LJ/eps_lit_UA
-#Tmatrix_eps[1,2] = eps_lit_AUA/eps_lit_UA
-#Tmatrix_eps[2,0] = eps_lit_LJ/eps_lit_AUA
-#Tmatrix_eps[2,1] = eps_lit_UA/eps_lit_AUA
-#           
-#Tmatrix_sig = np.ones([3,3])
-#Tmatrix_sig[0,1] = sig_lit_UA/sig_lit_LJ
-#Tmatrix_sig[0,2] = sig_lit_AUA/sig_lit_LJ
-#Tmatrix_sig[1,0] = sig_lit_LJ/sig_lit_UA
-#Tmatrix_sig[1,2] = sig_lit_AUA/sig_lit_UA
-#Tmatrix_sig[2,0] = sig_lit_LJ/sig_lit_AUA
-#Tmatrix_sig[2,1] = sig_lit_UA/sig_lit_AUA           
-           
-# Initial estimates for standard deviation used in proposed distributions of MCMC
-guess_var = [1,20,0.05,0.05,0.02]
-# Variance (or standard deviation, need to verify which one it is) in priors for epsilon and sigma
-#prior_var = [5,0.001]
-
-
-#OCM: All of this first section is Rich's data setup, which I don't have any reason to alter.  I am focusing more on the monte carlo implementation
-
-
-
-
-#%%
-
-
-
-    
-
+guess_0 = [0,*ff_params_ref[1]]
+guess_1 = [1,*ff_params_ref[0]]
+#guess_2 = [1,eps_lit3_AUA,sig_lit3_AUA,Lbond_lit3_AUA,Q_lit3_AUA] 
 
 #%%
 # Simplify notation
@@ -253,46 +182,48 @@ norm=distributions.norm.pdf
 unif=distributions.uniform.pdf
 
 properties = 'rhol+Psat'
-
+number_criteria = 'two'
+sig_prior=[0.2,0.5]
+eps_prior=[0,200]
+L_prior=[0,0.3]
+Q_prior=[0,2]
 def calc_posterior(model,eps,sig,L,Q):
 
     logp = 0
 #    print(eps,sig)
     # Using noninformative priors
-    logp += duni(sig, 0.2, 0.5)
-    logp += duni(eps, 0,200) 
-    logp+=duni(L,0,0.5)
-    #logp+=duni(Q,0,2)
+    logp += duni(sig, *sig_prior)
+    logp += duni(eps, *eps_prior) 
+    logp+=duni(L,*L_prior)
     if model == 0:
         Q=0
     
     
     if model == 1:
-        logp+=duni(Q,0,2)
-        pass
+        logp+=duni(Q,*Q_prior)
         
     # OCM: no reason to use anything but uniform priors at this point.  Could probably narrow the prior ranges a little bit to improve acceptance,
     #But Rich is rightly being conservative here especially since evaluations are cheap.
     
 #    print(eps,sig)
     #rhol_hat_fake = rhol_hat_models(T_lin,model,eps,sig)
-    rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig,L,Q) #[kg/m3]
-    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig,L,Q) #[kPa]   
-    SurfTens_hat = SurfTens_hat_models(T_SurfTens_data,model,eps,sig,L,Q)     
+    rhol_hat = rhol_hat_models(thermo_data_rhoL[:,0],model,eps,sig,L,Q) #[kg/m3]
+    Psat_hat = Psat_hat_models(thermo_data_Pv[:,0],model,eps,sig,L,Q) #[kPa]   
+    SurfTens_hat = SurfTens_hat_models(thermo_data_SurfTens[:,0],model,eps,sig,L,Q)     
  
     # Data likelihood
     if properties == 'rhol':
-        logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
+        logp += sum(dnorm(thermo_data_rhoL[:,1],rhol_hat,t_rhol**-2.))
         #logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
     elif properties == 'Psat':
-        logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
+        logp += sum(dnorm(thermo_data_Pv[:,1],Psat_hat,t_Psat**-2.))
     elif properties == 'rhol+Psat':
-        logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
-        logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
+        logp += sum(dnorm(thermo_data_rhoL[:,1],rhol_hat,t_rhol**-2.))
+        logp += sum(dnorm(thermo_data_Pv[:,1],Psat_hat,t_Psat**-2.))
     elif properties == 'All':
-         logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
-         logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))           
-         logp += sum(dnorm(SurfTens_data,SurfTens_hat,t_SurfTens**-2))
+         logp += sum(dnorm(thermo_data_rhoL[:,1],rhol_hat,t_rhol**-2.))
+         logp += sum(dnorm(thermo_data_Pv[:,1],Psat_hat,t_Psat**-2.))           
+         logp += sum(dnorm(thermo_data_SurfTens[:,1],SurfTens_hat,t_SurfTens**-2))
     return logp
     #return rhol_hat
     
@@ -301,10 +232,23 @@ def calc_posterior(model,eps,sig,L,Q):
 
 def jacobian(n_models,n_params,w,lamda,AUA_opt_params,AUA_Q_opt_params):
     jacobian=np.ones((n_models,n_models))
+    
+    
+    
+    #Optimum Matching
+    jacobian[0,1]=(1/(lamda*w))*(AUA_Q_opt_params[0]*AUA_Q_opt_params[1]*AUA_Q_opt_params[2])/(AUA_opt_params[0]*AUA_opt_params[1]*AUA_opt_params[2])
+    jacobian[1,0]=w*lamda*(AUA_opt_params[0]*AUA_opt_params[1]*AUA_opt_params[2])/(AUA_Q_opt_params[0]*AUA_Q_opt_params[1]*AUA_Q_opt_params[2])
+    
+    #Direct transfer
+    #jacobian[0,1]=1/(lamda*w)
+    #jacobian[1,0]=w*lamda
+    
+    
     #jacobian[0,1]=(1/(lamda*w))*(AUA_Q_opt_params[0]*AUA_Q_opt_params[1])/(AUA_opt_params[0]*AUA_opt_params[1])
     #jacobian[1,0]=w*lamda*(AUA_opt_params[0]*AUA_opt_params[1])/(AUA_Q_opt_params[0]*AUA_Q_opt_params[1])
     #jacobian[0,1]=1/(lamda*w)
     #jacobian[1,0]=w*lamda
+    
     return jacobian
     
 
@@ -380,7 +324,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     current_log_prob = calc_posterior(*trace[0])
     
     logp_trace[0] = current_log_prob
-    percent_deviation_trace[0]=computePercentDeviations(T_rhol_data,T_Psat_data,T_SurfTens_data,initial_values,rhol_data,Psat_data,SurfTens_data,Tc_RP)
+    percent_deviation_trace[0]=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],initial_values,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
     current_params=trace[0].copy()
     record_acceptance='False'
     #----------------------------------------------------------------------------------------#
@@ -405,21 +349,21 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
             accept_vector[i]=1
         logp_trace[i+1] = new_log_prob
         trace[i+1] = new_params
-        percent_deviation_trace[i+1]=computePercentDeviations(T_rhol_data,T_Psat_data,T_SurfTens_data,trace[i+1],rhol_data,Psat_data,SurfTens_data,Tc_RP)
+        percent_deviation_trace[i+1]=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],trace[i+1],thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
         
         if (not (i+1) % tune_freq) and (i < tune_for):
         
-            print('Tuning on step %1.1i' %i)
+            #print('Tuning on step %1.1i' %i)
             #print(np.sum(accept_vector[i-tune_freq:]))
             acceptance_rate = np.sum(accept_vector)/i           
-            print(acceptance_rate)
+            #print(acceptance_rate)
             for m in range (n_params-1):
                 if acceptance_rate<0.2:
                     prop_sd[m+1] *= 0.9
-                    print('Yes')
+                    #print('Yes')
                 elif acceptance_rate>0.5:
                     prop_sd[m+1] *= 1.1
-                    print('No')         
+                    #print('No')         
            
             
     return trace,logp_trace, percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector
@@ -498,25 +442,35 @@ def model_proposal(current_model,n_models,n_params,params,jacobian,transition_fu
     while proposed_model==current_model:
         proposed_model=int(np.floor(np.random.random()*n_models))
         
-    lamda=5    
+    lamda=1
     params[0] = proposed_model
     if proposed_model==1:
         
-        #params[1] = (AUA_Q_opt_params[0]/AUA_opt_params[0])*params[1]
-        #params[2] = (AUA_Q_opt_params[1]/AUA_opt_params[1])*params[2]
-        #params[3] = (AUA_Q_opt_params[2]/AUA_opt_params[2])*params[3]
+        
+        #Optimum Matching
+        params[1] = (AUA_Q_opt_params[0]/AUA_opt_params[0])*params[1]
+        params[2] = (AUA_Q_opt_params[1]/AUA_opt_params[1])*params[2]
+        params[3] = (AUA_Q_opt_params[2]/AUA_opt_params[2])*params[3]
+        
+        
         w=runif()
         
         #THIS IS IMPORTANT needs to be different depending on which direction
         
-        
+        #params[4]=w*2
         params[4] = -(1/lamda)*np.log(w)
 
     if proposed_model==0:
-        #params[1] = (AUA_opt_params[0]/AUA_Q_opt_params[0])*params[1]
-        #params[2] = (AUA_opt_params[1]/AUA_Q_opt_params[1])*params[2]
-        #params[3] = (AUA_opt_params[2]/AUA_Q_opt_params[2])*params[3]
+        
+        #Optimum Matching
+        params[1] = (AUA_opt_params[0]/AUA_Q_opt_params[0])*params[1]
+        params[2] = (AUA_opt_params[1]/AUA_Q_opt_params[1])*params[2]
+        params[3] = (AUA_opt_params[2]/AUA_Q_opt_params[2])*params[3]
+        
+        #w=params[4]/2
         w=np.exp(-lamda*params[4])
+        
+        
         params[4]=0
         
 
@@ -548,7 +502,7 @@ n_models=2
 
 def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
     swap_freq=0.0
-    n_iter=100000
+    n_iter=200000
     tune_freq=100
     tune_for=10000
     parameter_prior_proposal=np.empty((n_models,np.size(guess_params,1),2))
@@ -619,13 +573,20 @@ def calc_posterior_refined(model,eps,sig,L,Q):
     return logp
     #return rhol_hat
 
-initial_values=guess_1 # Can use critical constants
+initial_values=guess_0 # Can use critical constants
 initial_sd = np.asarray(initial_values)/100
 n_iter=1000000
 tune_freq=100
 tune_for=10000
 n_models=2
-swap_freq=0.0
+swap_freq=0.1
+
+
+
+print('Compound: '+compound)
+print('Properties: '+properties)
+print('MCMC Steps: '+str(n_iter))
+
 #The fraction of times a model swap is suggested as the move, rather than an intra-model move
 trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params)
 
@@ -640,7 +601,7 @@ print('Attempted Moves')
 print(attempt_matrix)
 print('Accepted Moves')
 print(acceptance_matrix)
-#prob_matrix=acceptance_matrix/attempt_matrix
+prob_matrix=acceptance_matrix/attempt_matrix
 transition_matrix=np.ones((2,2))
 transition_matrix[0,1]=acceptance_matrix[0,1]/np.sum(attempt_matrix,1)[0]
 transition_matrix[1,0]=acceptance_matrix[1,0]/np.sum(attempt_matrix,1)[1]
@@ -649,14 +610,21 @@ transition_matrix[1,1]=1-transition_matrix[1,0]
 print('Transition Matrix:')
 print(transition_matrix)
 trace_tuned = trace[tune_for:]
+trace_tuned[:,2:]*=10
 percent_deviation_trace_tuned = percent_deviation_trace[tune_for:]
 model_params = trace_tuned[0,:]
 
+fname=compound+'_'+properties+'_'+str(n_points)+'_'+str(n_iter)+'_'+str(date.today())
+
+lit_params,lit_devs=import_literature_values(number_criteria,compound)
+#new_lit_devs=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],lit_devs,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
+
+#%%
+new_lit_devs=recompute_lit_percent_devs(lit_params,computePercentDeviations,thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],lit_devs,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
+pareto_point,pareto_point_values=findParetoPoints(percent_deviation_trace_tuned,trace_tuned,0)
 
 
-
-pareto_point,pareto_point_values=findParetoPoints(percent_deviation_trace_tuned,trace_tuned,1.3)
-
+'''
 max_ap = np.zeros(np.size(model_params))
 map_CI = np.zeros((np.size(model_params),2))
 for i in range(np.size(model_params)):
@@ -669,19 +637,29 @@ for i in range(np.size(model_params)):
     plt.show()
 max_ap[0]=np.floor(max_ap[0])
 plotPercentDeviations(percent_deviation_trace_tuned,pareto_point,'MCMC Points','Pareto Point')
-plotDeviationHistogram(percent_deviation_trace_tuned,pareto_point)
 
+
+
+
+plotDeviationHistogram(percent_deviation_trace_tuned,pareto_point)
+'''
 # Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
 model_count = np.array([len(trace_tuned[trace_tuned[:,0]==0]),len(trace_tuned[trace_tuned[:,0]==1])])
 
 
-prob_0 = 1.*model_count[0]/(n_iter-tune_for)
+prob_0 = 1.*model_count[0]/(n_iter-tune_for+1)
 print('Percent that  model 0 is sampled: '+str(prob_0 * 100.)) #The percent that use 1 parameter model
 
-prob_1 = 1.*model_count[1]/(n_iter-tune_for)
+prob_1 = 1.*model_count[1]/(n_iter-tune_for+1)
 print('Percent that model 1 is sampled: '+str(prob_1 * 100.)) #The percent that use two center UA LJ
 
+prob=[prob_0,prob_1]
+
 Exp_ratio=prob_0/prob_1
+
+plot_bar_chart(prob,fname,properties,compound,n_iter)
+
+create_percent_dev_triangle_plot(percent_deviation_trace_tuned,fname,'percent_dev_trace',new_lit_devs,prob,properties,compound,n_iter)
 
 #print('Analytical sampling ratio: %2.3f' % ratio)
 print('Experimental sampling ratio: %2.3f' % Exp_ratio )
@@ -696,9 +674,16 @@ trace_model_1=[]
 log_trace_0=[]
 log_trace_1=[]
 
+
 plt.plot(logp_trace,label='Log Posterior')
 plt.legend()
 plt.show()
+
+np.save('trace/trace_'+fname+'.npy',trace_tuned)
+np.save('logprob/logprob_'+fname+'.npy',logp_trace)
+np.save('percent_dev/percent_dev_'+fname+'.npy',percent_deviation_trace_tuned)
+
+
 
 for i in range(np.size(trace_tuned,0)):
     if trace_tuned[i,0] == 0:
@@ -713,6 +698,12 @@ for i in range(np.size(trace_tuned,0)):
 trace_model_0=np.asarray(trace_model_0)
 trace_model_1=np.asarray(trace_model_1)
 
+
+
+create_param_triangle_plot_4D(trace_model_0,fname,'trace_model_0',lit_params,properties,compound,n_iter)
+create_param_triangle_plot_4D(trace_model_1,fname,'trace_model_1',lit_params,properties,compound,n_iter)
+
+get_metadata(compound,properties,sig_prior,eps_prior,L_prior,Q_prior,n_iter,swap_freq,n_points,transition_matrix,prob,attempt_matrix,acceptance_matrix)
 #%%
 '''
 f = plt.figure()
