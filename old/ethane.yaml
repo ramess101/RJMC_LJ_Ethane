@@ -1,0 +1,58 @@
+### This is a yaml file with all the Refprop values, force field parameters,
+### simulation temperatures, and other physical constants for Argon
+
+force_field_params:
+
+    eps_lit_AUA:     134.5     # [K]
+    sig_lit_AUA:     0.352   # [nm]
+    Lbond_lit_AUA:       0.230 #[nm]
+    lam_lit_AUA:     12
+    
+    eps_lit2_AUA:     138.56    # [K]
+    sig_lit2_AUA:     0.34818   # [nm]
+    Lbond_lit2_AUA:       0.24161 #[nm]
+    Q_lit2_AUA:       0.145 #[Dnm]
+    
+    eps_lit3_AUA:     143.11     # [K]
+    sig_lit3_AUA:     0.34623   # [nm]
+    Lbond_lit3_AUA:       0.25577 #[nm]
+    Q_lit3_AUA:       0. #[Dnm]
+    
+    eps_lit_UA:     98     # [K]
+    sig_lit_UA:     0.375   # [nm]
+    Lbond_lit_UA:       0.154 #[nm]
+    lam_lit_UA:     12
+
+    eps_lit_LJ:     236     # [K]
+    sig_lit_LJ:     0.42   # [nm]
+    
+    eps_Mess_UP: 98.4966
+    sig_Mess_UP: 0.37491
+    
+    eps_Type_B: [98.085, 98.500, 98.780, 99.050, 98.270, 98.950, 98.380, 98.830]
+    sig_Type_B: [0.37582, 0.37340, 0.37680, 0.37510, 0.37452, 0.37580, 0.37645, 0.37430]
+
+Simulation_Results:
+
+    TraPPE_lit:
+    
+        Martin:
+            Temp: [178,197,217,236,256,275]
+        
+        Validation:
+            Temp: [178, 197, 217, 256, 275, 279, 283, 288] #[K]
+            rho_L: [0.5512, 0.5262, 0.4984, 0.4342, 0.3937, 0.3835, 0.3726, 0.3589] #[gm/mL]
+            rho_v: [0.0023, 0.0053, 0.0111, 0.0350, 0.0598, 0.0648, 0.0739, 0.09] #[gm/mL]
+            P_v: [111, 272, 598, 1880, 2975, 3200, 3502, 3940] #[kPa]
+            
+        UA2:
+            Temp: [178,197,212,236,256,280,285,290,295] #[K]
+            rho_L: [0.5518,0.52778,0.5078,0.473,0.43996,0.3917,0.3796,0.3663,0.3516] #[gm/mL]
+            rho_v: [0.001464,0.00368,0.00675,0.01537,0.0278,0.0545,0.0628,0.0732,0.087] #[gm/mL]
+            P_v: [70.4,190.9,366,863,1551,2819,3149,3514,3911] #[kPa]
+
+physical_constants:
+
+    M_w: 30.069 #[gm/mol]
+    T_c: 305.32 #[K]
+    rho_c: 206.81 #[kg/m3]

@@ -1,0 +1,21 @@
+### This is a yaml file with the parameters found in Lotfi et al.
+
+correlation_parameters:
+
+    Lofti:
+
+        T_c_star: 1.31
+        rho_c_star: 0.314
+    
+        rho_L_star_params: [0.477, 0.2124, -0.01151]
+        
+        rho_v_star_params: [-0.477, 0.05333, 0.1261]
+        
+        P_v_star_params: [1.2629, -4.8095, -0.15115]
+        
+        HVP_star_params: [6.4925, 2.9644, -1.8502]
+        
+
+    
+
+    
