@@ -1,0 +1,65 @@
+\documentclass[12pt]{minimal}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\renewcommand*{\arraystretch}{1.5}
+\begin{document}
+
+Problem of interest: We are interested in drawing samples from \emph{multiple} probability distribution function over two variables, $ \mathbf{f}(\sigma, \epsilon)= f_1(\sigma, \epsilon), f_2((\sigma, \epsilon),f_3(\sigma, \epsilon) $. These probability distribution functions are representative of different models that have the same parameter space.  We are also interested in jumping between probability distributions, such that the \emph{choice} of distribution is another variable in a Bayesian inference problem. 
+
+ A widely accepted method of simulating such draws is through the Reversible Jump Markov Chain Monte Carlo (RJMC) algorithm.  The algorithm modifies the traditional Metropolis-Hastings algorithm by adding a Jacobian term that maps between dimensional space.  For a transition between state $x$ and proposed state $x'$, the transition probability is given by:
+
+\begin{equation}
+
+\alpha(x,x') = \mathrm{min} \left \{ 1, \frac{\pi(x')j(x'|x)g'(u')}{\pi(x)j(x|x')g(u)} \left | \frac{\partial(x',u')}{\partial(x,u)} \right | \right \}
+\end{equation}
+
+In this equation, $\pi(x')$ is the probability of the state $x'$, $j(x'|x)$ is the probability of proposing a move from state $x$ to state $x'$, $g(u)$ is a function that generates values for the "dimension-matching" variable $u$. (Note that in general, for $(x,u)$ with respective dimensions $(n,r)$ and $(x',u')$ with dimensions $(n',r')$, the equation $n+r=n'+r'$ must be satisfied.)  The remaining term, $\left | \frac{\partial(x',u')}{\partial(x,u)} \right |$, is the jacobian determinant corresponding to the transformation $(x,u) \rightarrow (x',u')$.
+
+In the simple case that we have presented, where models have the "same" parameter space, the need for dimension-matching variables disappears, and the transition probability is given by:
+
+\begin{equation}
+\alpha(x,x') = \mathrm{min} \left \{ 1, \frac{\pi(x')j(x'|x)}{\pi(x)j(x|x')} \left | \frac{\partial(x')}{\partial(x)} \right | \right \}
+
+\end{equation}
+
+In this case, there are two separate types of moves we are making: intra-model moves, where new values in parameter space are proposed without changing the model.  These moves are simple, and, because there is no change in model, the Jacobian term is simply equal to 1.  With appropriate choice of transition kernel $j(\sigma, \epsilon)$, $j$ cancels from the acceptance probability, leaving the simple expression:
+
+\begin{equation}
+\alpha((\sigma, \epsilon),(\sigma', \epsilon')) = \mathrm{min} \left \{ 1, \frac{\pi(\sigma', \epsilon')}{\pi(\sigma, \epsilon)} \right \}
+\end{equation}
+
+
+This is a standard M-H MCMC move.  However, for MC moves between models, it is slightly more difficult.  Because the pdfs $f_1(\sigma, \epsilon), f_2((\sigma, \epsilon),f_3(\sigma, \epsilon)$ have different high probability regions, proposing a model swap with $(\sigma, \epsilon)$ will lead to rejection a vast majority of the time. To overcome this, Rich Messerly has proposed an approach to map between the high probability regions.  In this approach, the optimal values of $\sigma, \epsilon$ for each model are determined from analytical models, and the following map is used:
+
+\begin{equation}
+g^{\epsilon}_{i\rightarrow j}(\sigma_i,\epsilon_i)=\left ( \frac{\epsilon^{opt}_j}{\epsilon^{opt}_i}\right ) \epsilon_i \, ; \, g^{\sigma}_{i\rightarrow j}(\sigma_i,\epsilon_i)=\left ( \frac{\sigma^{opt}_j}{\sigma^{opt}_i}\right ) \sigma_i
+\end{equation}
+\begin{equation}
+\epsilon_j=g^{\epsilon}_{i\rightarrow j}(\sigma_i,\epsilon_i) \, ; \, \sigma_j=g^{\sigma}_{i\rightarrow j}(\sigma_i,\epsilon_i)
+\end{equation}
+
+It is important to recognize that the variables $\sigma_i$ and $\sigma_j$ are \emph{different} variables that we are transforming between.  It is helpful to think of the transition $(\sigma_i,\epsilon_i)\rightarrow (\sigma_j,\epsilon_j)$ as "stretching" and "squashing" the variable space $\sigma_i \times \epsilon_i$ so that it is equivalent to the variable space $\sigma_j \times \epsilon_j$.
+
+Because we are changing from one variable space to another, we need to include the Jacobian determinant term that accounts for the transformation of the variable space:
+\begin{eqnarray}
+J & = & \begin{vmatrix}
+\frac{\partial g^{\sigma}_{i\rightarrow j}}{\partial \sigma } & \frac{\partial g^{\sigma}_{i\rightarrow j}}{\partial \epsilon } \\ 
+\frac{\partial g^{\epsilon}_{i\rightarrow j}}{\partial \sigma } & \frac{\partial g^{\epsilon}_{i\rightarrow j}}{\partial \epsilon }
+\end{vmatrix}\\
+J & = & \begin{vmatrix}
+\frac{\sigma^{opt}_j}{\sigma^{opt}_i} & 0 \\ 
+0 & \frac{\epsilon^{opt}_j}{\epsilon^{opt}_i}
+\end{vmatrix}\\
+J & = & \left (\frac{\sigma^{opt}_j}{\sigma^{opt}_i} \cdot \frac{\epsilon^{opt}_j}{\epsilon^{opt}_i} \right )
+\end{eqnarray}
+
+As such, the acceptance probability in this case becomes:
+
+\begin{eqnarray}
+\alpha((\sigma_i, \epsilon_i),(\sigma_j, \epsilon_j)) & = & \mathrm{min} \left \{ 1, \frac{\pi(\sigma_j, \epsilon_j)}{\pi(\sigma_i, \epsilon_i)} \left | \frac{\partial(\sigma_j, \epsilon_j)}{\partial(\sigma_i, \epsilon_i)} \right | \right \}\\
+\alpha((\sigma_i, \epsilon_i),(\sigma_j, \epsilon_j)) & = & \mathrm{min} \left \{ 1, \frac{\pi(\sigma_j, \epsilon_j)}{\pi(\sigma_i, \epsilon_i)} \left ( \frac{\sigma^{opt}_j}{\sigma^{opt}_i} \cdot \frac{\epsilon^{opt}_j}{\epsilon^{opt}_i} \right ) \right \}\\
+\end{eqnarray}
+
+
+
+\end{document}
