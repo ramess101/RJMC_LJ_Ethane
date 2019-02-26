@@ -14,6 +14,7 @@ m2_to_nm2 = 1e18
 gm_to_kg = 1./1000
 J_to_kJ = 1./1000
 J_per_m3_to_kPA = 1./1000
+D_to_sqrtJm3 = 3.1623e-25 
 
 class LennardJones_2C():
     def __init__(self,M_w):
@@ -101,9 +102,23 @@ class LennardJones_2C():
         return rho_star
     
     def rho_hat_2CLJQ(self,Temp,eps,sig,Lbond,Qpole,phase):
+        '''
+        inputs:
+            Temp: temperature [K]
+            eps: epsilon/kb [K]
+            sig: sigma [nm]
+            Lbond: bond-length [nm]
+            Qpole: quadrupole [Debye * nm]
+            phase: liquid or vapor
+        outputs:
+            Psat: vapor pressure [kPa]
+        '''
+        
         M_w = self.M_w
         T_star = Temp/eps #note that eps is defined as eps/kB
-        Q2_star = Qpole**2/(eps*sig**5)
+        Qpole = Qpole * D_to_sqrtJm3 #[(J*m3)^(1/2) nm]
+        Q2pole = Qpole**2 * m3_to_nm3 #[J*nm5]
+        Q2_star = Q2pole/(eps*k_B*sig**5) #note that eps is defined as eps/kB
         L_star = Lbond/sig
         rho_star = self.rho_star_hat_2CLJQ(T_star,Q2_star,L_star,phase)
         rho = rho_star *  M_w  / sig**3 / N_A * m3_to_nm3 * gm_to_kg #[kg/m3]
@@ -129,8 +144,21 @@ class LennardJones_2C():
         return Psat_star
     
     def Psat_hat_2CLJQ(self,Temp,eps,sig,Lbond,Qpole):
+        '''
+        inputs:
+            Temp: temperature [K]
+            eps: epsilon/kb [K]
+            sig: sigma [nm]
+            Lbond: bond-length [nm]
+            Qpole: quadrupole [Debye * nm]
+        outputs:
+            Psat: vapor pressure [kPa]
+        '''
+        
         T_star = Temp/eps #note that eps is defined as eps/kB
-        Q2_star = Qpole**2/(eps*sig**5) #note that eps is defined as eps/kB
+        Qpole = Qpole * D_to_sqrtJm3 #[(J*m3)^(1/2) nm]
+        Q2pole = Qpole**2 * m3_to_nm3 #[J*nm5]
+        Q2_star = Q2pole/(eps*k_B*sig**5) #note that eps is defined as eps/kB
         L_star = Lbond/sig
         Psat_star = self.Psat_star_hat_2CLJQ(T_star,Q2_star,L_star)
         Psat = Psat_star *  eps  / sig**3 * k_B * m3_to_nm3 * J_per_m3_to_kPA #[kPa] #note that eps is defined as eps/kB
@@ -163,15 +191,40 @@ class LennardJones_2C():
         return ST_star
         
     def ST_hat_2CLJQ(self,Temp,eps,sig,Lbond,Qpole):
+        '''
+        inputs:
+            Temp: temperature [K]
+            eps: epsilon/kb [K]
+            sig: sigma [nm]
+            Lbond: bond-length [nm]
+            Qpole: quadrupole [Debye * nm]
+        outputs:
+            ST: surface tnesion [J/m2]
+        '''
+        
         T_star = Temp/eps #note that eps is defined as eps/kB
-        Q2_star = Qpole**2/(eps*sig**5) #note that eps is defined as eps/kB
+        Qpole = Qpole * D_to_sqrtJm3 #[(J*m3)^(1/2) nm]
+        Q2pole = Qpole**2 * m3_to_nm3 #[J*nm5]
+        Q2_star = Q2pole/(eps*k_B*sig**5) #note that eps is defined as eps/kB
         L_star = Lbond/sig
         ST_star = self.ST_star_hat_2CLJQ(T_star,Q2_star,L_star)
         ST = ST_star *  eps  / sig**2 * k_B * m2_to_nm2 #[J/m2] #note that eps is defined as eps/kB
         return ST
 
     def T_c_hat_2CLJQ(self,eps,sig,Lbond,Qpole):
-        Q2_star = Qpole**2/(eps*sig**5)
+        '''
+        inputs:
+            eps: epsilon/kb [K]
+            sig: sigma [nm]
+            Lbond: bond-length [nm]
+            Qpole: quadrupole [Debye * nm]
+        outputs:
+            T_c: critical temperature [K]
+        '''
+        
+        Qpole = Qpole * D_to_sqrtJm3 #[(J*m3)^(1/2) nm]
+        Q2pole = Qpole**2 * m3_to_nm3 #[J*nm5]
+        Q2_star = Q2pole/(eps*k_B*sig**5) #note that eps is defined as eps/kB
         L_star = Lbond/sig
         T_c_star = self.T_c_star_hat(Q2_star,L_star)
         T_c = T_c_star * eps
