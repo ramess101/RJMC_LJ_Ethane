@@ -111,7 +111,7 @@ class LennardJones_2C():
             Qpole: quadrupole [Debye * nm]
             phase: liquid or vapor
         outputs:
-            Psat: vapor pressure [kPa]
+            rho: density [kg/m3]
         '''
         
         M_w = self.M_w
