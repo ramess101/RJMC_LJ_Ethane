@@ -21,42 +21,16 @@ import random as rm
 from pymc3.stats import hpd
 import matplotlib.patches as mpatches
 from datetime import datetime,date
-'''
-# Load REFPROP data from file so that user does not need REFPROP
-data = np.loadtxt('TRC_deltaHv.txt')
-T_deltaHv = data[:,0] #[K]
-RP_deltaHv = data[:,1] #[kJ/mol]
+import copy
 
-data = np.loadtxt('TRC_data_rhoL.txt')
-T_rhol_data = data[:,0] #[K]
-rhol_data = data[:,1] #[kJ/mol]
 
-data = np.loadtxt('TRC_data_Pv.txt')
-T_Psat_data = data[:,0] #[K]
-Psat_data = data[:,1] #[kJ/mol]
-
-# Limit temperature range to that which is typical of ITIC MD simulations
-
-T_min = 167.9
-T_max = 290.1
-
-rhol_data = rhol_data[T_rhol_data>T_min]
-T_rhol_data = T_rhol_data[T_rhol_data>T_min]
-rhol_data = rhol_data[T_rhol_data<T_max]
-T_rhol_data = T_rhol_data[T_rhol_data<T_max]
-
-Psat_data = Psat_data[T_Psat_data>T_min]
-T_Psat_data = T_Psat_data[T_Psat_data>T_min]
-Psat_data = Psat_data[T_Psat_data<T_max]
-T_Psat_data = T_Psat_data[T_Psat_data<T_max]
-'''
-def computePercentDeviations(temp_values_rhol,temp_values_psat,temp_values_surftens,parameter_values,rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models):
+def computePercentDeviations(compound_2CLJ,temp_values_rhol,temp_values_psat,temp_values_surftens,parameter_values,rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models):
     
     
-    rhol_model=rhol_hat_models(temp_values_rhol,*parameter_values)
-    psat_model=Psat_hat_models(temp_values_psat,*parameter_values)
-    surftens_model=SurfTens_hat_models(temp_values_surftens,*parameter_values)
-    T_c_model=T_c_hat_models(*parameter_values)
+    rhol_model=rhol_hat_models(compound_2CLJ,temp_values_rhol,*parameter_values)
+    psat_model=Psat_hat_models(compound_2CLJ,temp_values_psat,*parameter_values)
+    surftens_model=SurfTens_hat_models(compound_2CLJ,temp_values_surftens,*parameter_values)
+    T_c_model=T_c_hat_models(compound_2CLJ,*parameter_values)
     
     rhol_deviation_vector=((rhol_data-rhol_model)/rhol_data)**2
     psat_deviation_vector=((psat_data-psat_model)/psat_data)**2
@@ -190,13 +164,18 @@ def parse_data_ffs(compound):
     Tc_lit = np.loadtxt('TRC_data/'+compound+'/Tc.txt',skiprows=1)
     M_w = np.loadtxt('TRC_data/'+compound+'/Mw.txt',skiprows=1)
     
+    df=pd.read_csv('NIST_bondlengths/NIST_bondlengths.txt',delimiter='\t')
+    df=df[df.Compound==compound]
+    NIST_bondlength=np.asarray(df)
+    
+    
     data=['rhoL','Pv','SurfTens']
     data_dict={}
     for name in data:
         df=pd.read_table('TRC_data/'+compound+'/'+name+'.txt')
         df=df.dropna()
         data_dict[name]=df
-    return ff_params_ref, Tc_lit, M_w,data_dict
+    return ff_params_ref, Tc_lit, M_w,data_dict, NIST_bondlength[0][1]/10
 
 
 def filter_thermo_data(thermo_data,T_min,T_max,n_points):
@@ -283,12 +262,7 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         axs[3,3].hist(trace[:,4],bins=50,color='m',density=True)
         
         
-        axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='g',marker='+',label='Literature Values')
-        axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='g',marker='+')
-        axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='g',marker='+')
-        axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='g',marker='+')
-        axs[1,3].scatter(lit_values[::4,3],lit_values[::4,1],color='g',marker='+')
-        axs[2,3].scatter(lit_values[::4,3],lit_values[::4,2],color='g',marker='+')    
+
         
         axs[0,1].hist2d(trace[:,2],trace[:,1],bins=100,cmap='plasma',label='RJMC Sampling')
         axs[0,2].hist2d(trace[:,3],trace[:,1],bins=100,cmap='plasma')
@@ -297,7 +271,12 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         axs[1,3].hist2d(trace[:,4],trace[:,2],bins=100,cmap='plasma')
         axs[2,3].hist2d(trace[:,4],trace[:,3],bins=100,cmap='plasma')
         
-
+        axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='g',marker='+',label='Literature Values')
+        axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='g',marker='+')
+        axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='g',marker='+')
+        axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='g',marker='+')
+        axs[1,3].scatter(lit_values[::4,3],lit_values[::4,1],color='g',marker='+')
+        axs[2,3].scatter(lit_values[::4,3],lit_values[::4,2],color='g',marker='+')    
 
        
         #axs[0,1].set_ylim([min(lit_values[:,0]),max(lit_values[:,0])])
@@ -371,12 +350,7 @@ def create_percent_dev_triangle_plot(trace,fname,tracename,lit_values,prob,prope
     axs[3,3].hist(trace[:,3],bins=50,color='m',density=True)
     
     
-    axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='g',marker='+',label='Literature Values')
-    axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='g',marker='+')
-    axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='g',marker='+')
-    axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='g',marker='+')
-    axs[1,3].scatter(lit_values[::4,3],lit_values[::4,1],color='g',marker='+')
-    axs[2,3].scatter(lit_values[::4,3],lit_values[::4,2],color='g',marker='+')    
+ 
     
     
     axs[0,1].hist2d(trace[:,1],trace[:,0],bins=100,cmap='plasma')
@@ -386,7 +360,12 @@ def create_percent_dev_triangle_plot(trace,fname,tracename,lit_values,prob,prope
     axs[1,3].hist2d(trace[:,3],trace[:,1],bins=100,cmap='plasma')
     axs[2,3].hist2d(trace[:,3],trace[:,2],bins=100,cmap='plasma')
     
-
+    axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='g',marker='+',label='Literature Values')
+    axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='g',marker='+')
+    axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='g',marker='+')
+    axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='g',marker='+')
+    axs[1,3].scatter(lit_values[::4,3],lit_values[::4,1],color='g',marker='+')
+    axs[2,3].scatter(lit_values[::4,3],lit_values[::4,2],color='g',marker='+')   
     
     #axs[0,1].set_xlim([min(lit_values[::4,1]),max(lit_values[::4,1])])
     #axs[0,1].set_ylim([min(lit_values[::4,0]),max(lit_values[::4,0])])
@@ -456,12 +435,24 @@ def import_literature_values(criteria,compound):
     return np.asarray(df1),np.asarray(df2)
     #return df1,df2
     
-def plot_bar_chart(prob,filename,properties,compound,n_iter):
-    x=np.arange(2)
-    basis=min(prob)
+def plot_bar_chart(prob,filename,properties,compound,n_iter,n_models):
+    x=np.arange(n_models)
+    prob=prob[-1:]+prob[:-1]
+    print(prob)
+    prob_copy=copy.deepcopy(prob)
+    basis=min(prob_copy)
+    while basis==0:
+        prob_copy=np.delete(prob_copy,np.argmin(prob))
+        basis=min(prob_copy)
     value=prob/basis
-    plt.bar(x,value,color=['red','blue'])
-    plt.xticks(x,('AUA','AUA+Q'))
+    if np.size(prob) == 2:
+        color=['red','blue']
+        label=('AUA,AUA+Q')
+    elif np.size(prob) == 3:
+        color=['red','blue','orange']
+        label=('UA','AUA','AUA+Q')
+    plt.bar(x,value,color=['red','blue','orange'])
+    plt.xticks(x,('UA','AUA','AUA+Q'))
     plt.title('Model Bayes Factor, '+compound+', '+properties+', '+str(n_iter)+' steps')
     plt.ylabel('Bayes Factor')
     
@@ -469,7 +460,7 @@ def plot_bar_chart(prob,filename,properties,compound,n_iter):
     plt.show()
     return
 
-def recompute_lit_percent_devs(lit_values,computePercentDeviations,temp_values_rhol,temp_values_psat,temp_values_surftens,parameter_values,rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models):
+def recompute_lit_percent_devs(lit_values,computePercentDeviations,temp_values_rhol,temp_values_psat,temp_values_surftens,parameter_values,rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models,compound_2CLJ):
     new_lit_devs=[]
     
     df=pd.DataFrame(lit_values)
@@ -481,7 +472,7 @@ def recompute_lit_percent_devs(lit_values,computePercentDeviations,temp_values_r
     #print(new_lit_values)
     
     for i in range(np.size(new_lit_values,0)):
-        devs=computePercentDeviations(temp_values_rhol,temp_values_psat,temp_values_surftens,new_lit_values[i],rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
+        devs=computePercentDeviations(compound_2CLJ,temp_values_rhol,temp_values_psat,temp_values_surftens,new_lit_values[i],rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
         new_lit_devs.append(devs)
     return np.asarray(new_lit_devs)
     
@@ -494,3 +485,93 @@ def get_metadata(compound,properties,sig_prior,eps_prior,L_prior,Q_prior,n_iter,
     f.write( str(metadata) )
     f.close()
     return    
+
+
+
+# Create functions that return properties for a given model, eps, sig
+
+def rhol_hat_models(compound_2CLJ,Temp,model,eps,sig,L,Q):
+    '''
+    L_nm=L/10
+    sig_nm=sig/10
+    Q_nm=Q/10
+    '''
+    if model == 0: #Two center AUA LJ
+    
+        rhol_hat = compound_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,0) 
+        
+    elif model == 1: #Two center AUA LJ+Q
+    
+        rhol_hat = compound_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,Q) 
+    
+
+    elif model == 2: #2CLJ model
+    
+        rhol_hat = compound_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,0) 
+        
+    return rhol_hat #[kg/m3]       
+  
+def Psat_hat_models(compound_2CLJ,Temp,model,eps,sig,L,Q):
+    '''
+    L_nm=L/10
+    sig_nm=sig/10
+    Q_nm=Q/10
+    '''
+    if model == 0: #Two center AUA LJ
+    
+        Psat_hat = compound_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,0) 
+        
+    elif model == 1: #Two center AUA LJ+Q
+    
+        Psat_hat = compound_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,Q) 
+    
+
+    elif model == 2: #2CLJ model
+    
+        Psat_hat = compound_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,0) 
+        
+    return Psat_hat #[kPa]       
+
+def SurfTens_hat_models(compound_2CLJ,Temp,model,eps,sig,L,Q):
+    '''
+    L_nm=L/10
+    sig_nm=sig/10
+    Q_nm=Q/10
+    '''
+    if model == 0:
+        
+        SurfTens_hat=compound_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,0)
+        
+    elif model == 1:
+        
+        
+        
+        SurfTens_hat=compound_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,Q)
+        
+    elif model == 2:
+        
+        #Model 2 is the same as model 0, but the L value will be previously specified (not varying)
+        
+        SurfTens_hat=compound_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,0)
+        
+    return SurfTens_hat
+
+def T_c_hat_models(compound_2CLJ,model,eps,sig,L,Q):
+    '''
+    L_nm=L/10
+    sig_nm=sig/10
+    Q_nm=Q/10
+    '''
+    if model == 0: 
+        
+        T_c_hat=compound_2CLJ.T_c_hat_2CLJQ(eps,sig,L,0)
+    
+    elif model == 1: 
+        
+        T_c_hat=compound_2CLJ.T_c_hat_2CLJQ(eps,sig,L,Q)
+        
+    elif model == 2: 
+        
+        T_c_hat=compound_2CLJ.T_c_hat_2CLJQ(eps,sig,L,0)
+        
+    return T_c_hat
