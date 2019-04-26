@@ -1,0 +1,102 @@
+\documentclass[letterpaper,12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\begin{document}
+
+This document contains the transition functions for a RJMC problem between two models for the density and saturation pressure of a Lennard-Jones fluid.  The first model is the anisotropic united atom (AUA) model without a quadrupole; the second is the anisotropic united atom with quadrupole (AUA+Q) model.
+
+So, the two models have the following parameter spaces:
+
+\begin{align*}
+\Theta_0 &= (\epsilon_0, \sigma_0) \\
+\Theta_1 &= (\epsilon_1,\sigma_1,Q)
+\end{align*}
+
+We need to specify several functions, the first of which is the deterministic transition between $(\Theta_0,w)$ and $(\Theta_1,w')$.  Using our earlier approach from RJMC between several different 2-parameter models:
+
+\begin{align*}
+\epsilon_1 &= \frac{\epsilon_{opt,1}}{\epsilon_{opt,0}}\\
+\epsilon_0 &= \frac{\epsilon_{opt,0}}{\epsilon_{opt,1}}\\
+\sigma_1 &= \frac{\sigma_{opt,1}}{\sigma_{opt,0}}\\
+\sigma_0 &= \frac{\sigma_{opt,0}}{\sigma_{opt,1}}
+\end{align*}
+
+
+However, because in this case $\Theta_1$ has a parameter that $\Theta_0$ does not, we need to define a $w$ that can propose a value of $Q$ for $\Theta_1$.  A simple way to do this is via an exponential distribution with rate $\lambda$ $(Q \sim Exp(rate=\lambda))$.  
+
+Using the inverse cdf method, we draw $w \sim Unif(0,1)$ and then take $Q = -\frac{1}{\lambda} \ln(w)$. So, we can write the transition functions:
+
+\begin{align*}
+(\epsilon_1,\sigma_1, Q) &= h(\epsilon_0,\sigma_0, w) = \left ( \left ( \frac{\epsilon_{opt,1}}{\epsilon_{opt,0}} \right ) \epsilon_0, \left ( \frac{\sigma_{opt,1}}{\sigma_{opt,0}} \right ) \sigma_0, -\frac{1}{\lambda} \ln(w) \right )  \\
+(\epsilon_0,\sigma_0, Q) &= h'(\epsilon_1,\sigma_1, Q) = \left ( \left ( \frac{\epsilon_{opt,0}}{\epsilon_{opt,1}} \right ) \epsilon_1, \left ( \frac{\sigma_{opt,0}}{\sigma_{opt,1}} \right ) \sigma_1, \exp(-\lambda Q) \right )
+\end{align*}
+
+Writing out the Jacobian for AUA to AUA-Q:
+
+\begin{equation}
+\left | \frac{\partial(\epsilon_1,\sigma_1,Q)}{\partial (\epsilon_0,\sigma_0,w)} \right | =
+\begin{vmatrix}
+ \frac{\partial\epsilon_1}{\partial\epsilon_0} & \frac{\partial\epsilon_1}{\partial\sigma_0} & \frac{\partial\epsilon_1}{\partial w} \\
+ \frac{\partial\sigma_1}{\partial\epsilon_0} & \frac{\partial\sigma_1}{\partial\sigma_0} & \frac{\partial\sigma_1}{\partial w} \\
+ \frac{\partial Q}{\partial\epsilon_0} & \frac{\partial Q}{\partial\sigma_0} & \frac{\partial Q}{\partial w}
+\end{vmatrix} = 
+\begin{vmatrix}
+\frac{\epsilon_{opt,1}}{\epsilon_{opt,0}} & 0 & 0 \\
+0 & \frac{\sigma_{opt,1}}{\sigma_{opt,0}} & 0 \\
+0 & 0 & -\frac{1}{\lambda}
+\end{vmatrix}
+=\left (\frac{1}{w \lambda} \right ) \left (\frac{\epsilon_{opt,1}}{\epsilon_{opt,0}} \right ) \left ( \frac{\sigma_{opt,1}}{\sigma_{opt,0}} \right )
+\end{equation}
+
+Writing out the Jacobian for AUA-Q to AUA:
+
+
+\begin{equation}
+\left | \frac{\partial(\epsilon_0,\sigma_0,w)}{\partial (\epsilon_1,\sigma_1,Q)} \right | =
+\begin{vmatrix}
+ \frac{\partial\epsilon_0}{\partial\epsilon_1} & \frac{\partial\epsilon_0}{\partial\sigma_1} & \frac{\partial\epsilon_0}{\partial Q} \\
+ \frac{\partial\sigma_0}{\partial\epsilon_1} & \frac{\partial\sigma_0}{\partial\sigma_1} & \frac{\partial\sigma_0}{\partial Q} \\
+ \frac{\partial w}{\partial\epsilon_1} & \frac{\partial w}{\partial\sigma_1} & \frac{\partial w}{\partial Q}
+\end{vmatrix} = 
+\begin{vmatrix}
+\frac{\epsilon_{opt,0}}{\epsilon_{opt,1}} & 0 & 0 \\
+0 & \frac{\sigma_{opt,0}}{\sigma_{opt,1}} & 0 \\
+0 & 0 & -\lambda e^{(\lambda Q)}
+\end{vmatrix}
+=\left (\lambda e^{(\lambda Q)} \right ) \left (\frac{\epsilon_{opt,0}}{\epsilon_{opt,1}} \right ) \left ( \frac{\sigma_{opt,0}}{\sigma_{opt,1}} \right )
+\end{equation}
+
+Fortunately, this leaves us with a very simple form for the transition probability $g(w)$ and $g'(Q)$.  $g(w) = Unif (w,0,1) = 1$, and $g'(Q) = 1$, because $Q$ doesn't factor into the proposal for model 0. Since the transition from $(\epsilon,\sigma) \Rightarrow (\epsilon',\sigma')$ is entirely deterministic, its transition probability is also 1.  With these clever choices we can avoid complicated transition probabilities, although it may be necessary to use more complicated choices in the future.
+
+So, the acceptance probability for model 0 to model 1 is given by: 
+
+\begin{equation}
+\alpha((0,\vec{\theta_0}),(1,\vec{\theta_{1}})) = \min \left \{ 1, \frac{\pi(1,\vec{\theta_1} | \vec{x} )}{\pi(0,\vec{\theta_0} | \vec{x} )}  \left (\frac{1}{w \lambda} \right ) \left (\frac{\epsilon_{opt,1}}{\epsilon_{opt,0}} \right ) \left ( \frac{\sigma_{opt,1}}{\sigma_{opt,0}} \right )  \right \} 
+\end{equation}
+And the acceptance probability for model 1 to model 0 is given by:
+\begin{equation}
+\alpha((1,\vec{\theta_1}),(0,\vec{\theta_{0}})) = \min \left \{ 1, \frac{\pi(0,\vec{\theta_0} | \vec{x} )}{\pi(1,\vec{\theta_1} | \vec{x} )}    \left (\lambda e^{(\lambda Q)} \right ) \left (\frac{\epsilon_{opt,0}}{\epsilon_{opt,1}} \right ) \left ( \frac{\sigma_{opt,0}}{\sigma_{opt,1}} \right ) \right \}
+\end{equation}
+
+\subsection{Addendum}
+
+Adding a piecewise or disjointed proposal seems like it could be done with additional dummy variables and a piecewise $h(x,w)$.
+For example, imagine that we want have a probability region that looks something like this:
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.5\textwidth]{sigma_Q.png}
+\end{figure}
+
+Where we are mapping from the blue distribution to the orange distribution.  Most of the time we want to propose a low value of $Q$ and shift the $\epsilon,\sigma$ values over, but sometimes we would want to keep the epsilon and sigma the same and propose a high value of Q.  We could do this by proposing the following transition function $h(\sigma,\epsilon,w_1,w_2)$ with inverse $h'(\sigma',\epsilon',w_1',w_2')$, in the following manner.
+
+Forward:
+
+\begin{align*}
+
+
+
+\end{align*}
+
+\end{document}
