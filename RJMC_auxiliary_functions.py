@@ -29,18 +29,23 @@ def computePercentDeviations(compound_2CLJ,temp_values_rhol,temp_values_psat,tem
     
     rhol_model=rhol_hat_models(compound_2CLJ,temp_values_rhol,*parameter_values)
     psat_model=Psat_hat_models(compound_2CLJ,temp_values_psat,*parameter_values)
-    surftens_model=SurfTens_hat_models(compound_2CLJ,temp_values_surftens,*parameter_values)
+    if len(surftens_data) != 0:    
+        surftens_model=SurfTens_hat_models(compound_2CLJ,temp_values_surftens,*parameter_values)
+        surftens_deviation_vector=((surftens_data-surftens_model)/surftens_data)**2
+        surftens_mean_relative_deviation=np.sqrt(np.sum(surftens_deviation_vector)/np.size(surftens_deviation_vector))*100
+    else:
+        surftens_mean_relative_deviation=0
     T_c_model=T_c_hat_models(compound_2CLJ,*parameter_values)
     
     rhol_deviation_vector=((rhol_data-rhol_model)/rhol_data)**2
     psat_deviation_vector=((psat_data-psat_model)/psat_data)**2
-    surftens_deviation_vector=((surftens_data-surftens_model)/surftens_data)**2
+    
     T_c_relative_deviation=(T_c_data-T_c_model)*100/T_c_data
     
 
     rhol_mean_relative_deviation=np.sqrt(np.sum(rhol_deviation_vector)/np.size(rhol_deviation_vector))*100
     psat_mean_relative_deviation=np.sqrt(np.sum(psat_deviation_vector)/np.size(psat_deviation_vector))*100
-    surftens_mean_relative_deviation=np.sqrt(np.sum(surftens_deviation_vector)/np.size(surftens_deviation_vector))*100
+    
     
     return rhol_mean_relative_deviation, psat_mean_relative_deviation, surftens_mean_relative_deviation, T_c_relative_deviation
     
@@ -232,7 +237,46 @@ def uncertainty_models(T,T_c,thermo_property):
                 u[i]=12.0
     u/=100
     return u
-            
+
+'''
+def uncertainty_models(T,T_c,thermo_property):
+    Tr=T/T_c
+    u=np.zeros(np.size(Tr))
+    
+    #Linear models for uncertainties in the 2CLJQ correlation we are using, determined from Messerly analysis of figure from Stobener, Stoll, Werth
+    
+    #Starts at 0.3% for low values and ramps up to 1% for large values    
+    if thermo_property == 'rhoL':
+        for i in range(np.size(Tr)):
+            if Tr[i] < 0.9:
+                u[i]=1
+            elif 0.9 <= Tr[i] <= 0.95:
+                u[i]=1+(3-1)*(Tr[i]-0.9)/(0.95-0.9)
+            else:
+                u[i]=3
+                
+    #Starts at 20% for low values and ramps down to 2% for large values
+    if thermo_property == 'Pv':
+        for i in range(np.size(Tr)):
+            if Tr[i] <= 0.55:
+                u[i]=20
+            elif 0.55 <= Tr[i] <= 0.7:
+                u[i]=20+(5-20)*(Tr[i]-0.55)/(0.7-0.55)
+            else:
+                u[i]=5.0
+                
+    #Starts at 4% for low values and ramps up to 12% for higher values
+    if thermo_property == 'SurfTens':
+        for i in range(np.size(Tr)):
+            if Tr[i] <= 0.75:
+                u[i]=5
+            elif 0.75 <= Tr[i] <= 0.95:
+                u[i]=10+(20-10)*(Tr[i]-0.75)/(0.95-0.75)
+            else:
+                u[i]=15
+    u/=100
+    return u
+'''        
 def calculate_uncertainties(thermo_data,T_c):
     u_dict={}
     for name in thermo_data:
@@ -251,33 +295,60 @@ def calculate_uncertainties(thermo_data,T_c):
     return u_dict
         
 
-def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,compound,n_iter):
+def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior):
     if np.shape(trace) != (0,):
     
         fig,axs=plt.subplots(4,4,figsize=(8,8))
-        fig.suptitle('Parameter Marginal Distributions, '+compound+', '+properties+', '+str(n_iter)+' steps')
+        fig.suptitle('Parameter Marginal Distributions, '+compound+', '+properties+', '+str(n_iter)+' steps',fontsize=16)
         axs[0,0].hist(trace[:,1],bins=50,color='m',density=True,label='RJMC Sampling')
         axs[1,1].hist(trace[:,2],bins=50,color='m',density=True)
         axs[2,2].hist(trace[:,3],bins=50,color='m',density=True)
         axs[3,3].hist(trace[:,4],bins=50,color='m',density=True)
         
         
+        sig_prior=np.multiply(sig_prior,10)
+        L_prior=np.multiply(L_prior,10)
+        Q_prior=np.multiply(Q_prior,10)
+        
+        sig_range=np.linspace(0.5*min(trace[:,1]),2*max(trace[:,1]),num=100)
+        eps_range=np.linspace(0.5*min(trace[:,2]),2*max(trace[:,2]),num=100)
+        L_range=np.linspace(0.5*min(trace[:,3]),2*max(trace[:,3]),num=100)
+        
+        logitpdf=distributions.logistic.pdf
+        
+        #axs[0,0].plot(sig_range,1000000000*logitpdf(sig_range,*sig_prior))
+        #axs[1,1].plot(eps_range,1000000*logitpdf(eps_range,*eps_prior))
+        #axs[2,2].plot(L_range,10*logitpdf(L_range,*L_prior))
+        
+        '''
+        axs[0,0].axvline(x=eps_prior[0],color='r',linestyle='--',label='Uniform Prior')
+        axs[0,0].axvline(x=eps_prior[1],color='r',linestyle='--')
+        axs[1,1].axvline(x=sig_prior[0],color='r',linestyle='--')
+        axs[1,1].axvline(x=sig_prior[1],color='r',linestyle='--')
+        axs[2,2].axvline(x=L_prior[0],color='r',linestyle='--')
+        axs[2,2].axvline(x=L_prior[1],color='r',linestyle='--')
+        '''
+        axs[3,3].axvline(x=Q_prior[0],color='r',linestyle='--')
+        axs[3,3].axvline(x=Q_prior[1],color='r',linestyle='--')
+        
+        
 
         
-        axs[0,1].hist2d(trace[:,2],trace[:,1],bins=100,cmap='plasma',label='RJMC Sampling')
-        axs[0,2].hist2d(trace[:,3],trace[:,1],bins=100,cmap='plasma')
-        axs[0,3].hist2d(trace[:,4],trace[:,1],bins=100,cmap='plasma')
-        axs[1,2].hist2d(trace[:,3],trace[:,2],bins=100,cmap='plasma')
-        axs[1,3].hist2d(trace[:,4],trace[:,2],bins=100,cmap='plasma')
-        axs[2,3].hist2d(trace[:,4],trace[:,3],bins=100,cmap='plasma')
+        axs[0,1].hist2d(trace[:,2],trace[:,1],bins=100,cmap='cool',label='RJMC Sampling')
+        axs[0,2].hist2d(trace[:,3],trace[:,1],bins=100,cmap='cool')
+        axs[0,3].hist2d(trace[:,4],trace[:,1],bins=100,cmap='cool')
+        axs[1,2].hist2d(trace[:,3],trace[:,2],bins=100,cmap='cool')
+        axs[1,3].hist2d(trace[:,4],trace[:,2],bins=100,cmap='cool')
+        axs[2,3].hist2d(trace[:,4],trace[:,3],bins=100,cmap='cool')
         
-        axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='g',marker='+',label='Literature Values')
-        axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='g',marker='+')
-        axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='g',marker='+')
-        axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='g',marker='+')
-        axs[1,3].scatter(lit_values[::4,3],lit_values[::4,1],color='g',marker='+')
-        axs[2,3].scatter(lit_values[::4,3],lit_values[::4,2],color='g',marker='+')    
-
+        
+        axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none',label='Stobener Pareto Values')
+        axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none')
+        axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none')
+        axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='0.25',marker='o',alpha=0.5,facecolors='none')
+        axs[1,3].scatter(lit_values[::4,3],lit_values[::4,1],color='0.25',marker='o',alpha=0.5,facecolors='none')
+        axs[2,3].scatter(lit_values[::4,3],lit_values[::4,2],color='0.25',marker='o',alpha=0.5,facecolors='none')   
+        
        
         #axs[0,1].set_ylim([min(lit_values[:,0]),max(lit_values[:,0])])
         
@@ -317,14 +388,14 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         
     
         axs[0,0].set(ylabel=r'$\epsilon$ (K)')
-        axs[1,1].set(ylabel=r'$\sigma (\dot{A}$)')
-        axs[2,2].set(ylabel=r'L ($\dot{A}$)')
-        axs[3,3].set(ylabel=r'Q ($D\dot{A}$)')
+        axs[1,1].set(ylabel=r'$\sigma$ ($\AA$)')
+        axs[2,2].set(ylabel=r'L ($\AA$)')
+        axs[3,3].set(ylabel=r'Q (D$\AA$)')
     
         axs[0,0].set(xlabel=r'$\epsilon$ (K)') 
-        axs[0,1].set(xlabel=r'$\sigma (\dot{A}$)')
-        axs[0,2].set(xlabel=r'L ($\dot{A}$)')
-        axs[0,3].set(xlabel=r'Q ($D\dot{A}$)')
+        axs[0,1].set(xlabel=r'$\sigma$ ($\AA$)')
+        axs[0,2].set(xlabel=r'L ($\AA$)')
+        axs[0,3].set(xlabel=r'Q (D$\AA$)')
     
         axs[0,0].xaxis.set_label_position('top')
         axs[0,1].xaxis.set_label_position('top')
@@ -334,9 +405,9 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         handles,labels = axs[0,1].get_legend_handles_labels()
         handles0,labels0 = axs[0,0].get_legend_handles_labels()
         #plt.figlegend((label0,label1),('Literature','RJMC Sampling'))
-        fig.legend(handles,labels,loc=[0.05,0.3])
+        fig.legend(handles,labels,loc=[0.1,0.4])
         plt.savefig('triangle_plots/'+fname+tracename+'.png')
-        plt.show()
+        #plt.show()
     return
         
         
@@ -353,19 +424,19 @@ def create_percent_dev_triangle_plot(trace,fname,tracename,lit_values,prob,prope
  
     
     
-    axs[0,1].hist2d(trace[:,1],trace[:,0],bins=100,cmap='plasma')
-    axs[0,2].hist2d(trace[:,2],trace[:,0],bins=100,cmap='plasma')
-    axs[0,3].hist2d(trace[:,3],trace[:,0],bins=100,cmap='plasma')
-    axs[1,2].hist2d(trace[:,2],trace[:,1],bins=100,cmap='plasma')
-    axs[1,3].hist2d(trace[:,3],trace[:,1],bins=100,cmap='plasma')
-    axs[2,3].hist2d(trace[:,3],trace[:,2],bins=100,cmap='plasma')
+    axs[0,1].hist2d(trace[:,1],trace[:,0],bins=100,cmap='cool')
+    axs[0,2].hist2d(trace[:,2],trace[:,0],bins=100,cmap='cool')
+    axs[0,3].hist2d(trace[:,3],trace[:,0],bins=100,cmap='cool')
+    axs[1,2].hist2d(trace[:,2],trace[:,1],bins=100,cmap='cool')
+    axs[1,3].hist2d(trace[:,3],trace[:,1],bins=100,cmap='cool')
+    axs[2,3].hist2d(trace[:,3],trace[:,2],bins=100,cmap='cool')
     
-    axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='g',marker='+',label='Literature Values')
-    axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='g',marker='+')
-    axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='g',marker='+')
-    axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='g',marker='+')
-    axs[1,3].scatter(lit_values[::4,3],lit_values[::4,1],color='g',marker='+')
-    axs[2,3].scatter(lit_values[::4,3],lit_values[::4,2],color='g',marker='+')   
+    axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none',label='Stobener Pareto Values')
+    axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none')
+    axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none')
+    axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='0.25',marker='o',alpha=0.5,facecolors='none')
+    axs[1,3].scatter(lit_values[::4,3],lit_values[::4,1],color='0.25',marker='o',alpha=0.5,facecolors='none')
+    axs[2,3].scatter(lit_values[::4,3],lit_values[::4,2],color='0.25',marker='o',alpha=0.5,facecolors='none')   
     
     #axs[0,1].set_xlim([min(lit_values[::4,1]),max(lit_values[::4,1])])
     #axs[0,1].set_ylim([min(lit_values[::4,0]),max(lit_values[::4,0])])
@@ -421,7 +492,7 @@ def create_percent_dev_triangle_plot(trace,fname,tracename,lit_values,prob,prope
     fig.legend(handles,labels,loc=[0.05,0.3])
     
     plt.savefig('triangle_plots/'+fname+tracename+'.png')
-    plt.show()
+    #plt.show()
 
 
 def import_literature_values(criteria,compound):
@@ -440,10 +511,13 @@ def plot_bar_chart(prob,filename,properties,compound,n_iter,n_models):
     prob=prob[-1:]+prob[:-1]
     print(prob)
     prob_copy=copy.deepcopy(prob)
-    basis=min(prob_copy)
-    while basis==0:
-        prob_copy=np.delete(prob_copy,np.argmin(prob))
-        basis=min(prob_copy)
+    basis=min(i for i in prob if i > 0)
+    #while basis==0:
+        #prob_copy=np.delete(prob_copy,np.argmin(prob))
+        #if len(prob_copy)==0:
+        #    basis=1
+        #else:
+        #    basis=min(prob_copy)
     value=prob/basis
     if np.size(prob) == 2:
         color=['red','blue']
@@ -452,12 +526,12 @@ def plot_bar_chart(prob,filename,properties,compound,n_iter,n_models):
         color=['red','blue','orange']
         label=('UA','AUA','AUA+Q')
     plt.bar(x,value,color=['red','blue','orange'])
-    plt.xticks(x,('UA','AUA','AUA+Q'))
-    plt.title('Model Bayes Factor, '+compound+', '+properties+', '+str(n_iter)+' steps')
-    plt.ylabel('Bayes Factor')
+    plt.xticks(x,('UA','AUA','AUA+Q'),fontsize=14)
+    plt.title('Model Bayes Factor, '+compound+', '+properties+', '+str(n_iter)+' steps',fontsize=14)
+    plt.ylabel('Bayes Factor',fontsize=14)
     
     plt.savefig('bar_charts/bayes_factor'+filename+'.png')
-    plt.show()
+    #plt.show()
     return
 
 def recompute_lit_percent_devs(lit_values,computePercentDeviations,temp_values_rhol,temp_values_psat,temp_values_surftens,parameter_values,rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models,compound_2CLJ):
@@ -575,3 +649,52 @@ def T_c_hat_models(compound_2CLJ,model,eps,sig,L,Q):
         T_c_hat=compound_2CLJ.T_c_hat_2CLJQ(eps,sig,L,0)
         
     return T_c_hat
+
+
+
+
+
+
+
+#parameter_prior_proposals,trace_tuned=mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd)
+
+def calc_posterior_refined(model,eps,sig,L,Q):
+
+    logp = 0
+#    print(eps,sig)
+    # Using noninformative priors
+ 
+    
+    if model == 0:
+        Q=0
+        logp += dnorm(eps,*parameter_prior_proposals[0,1])
+        logp += dnorm(sig,*parameter_prior_proposals[0,2])
+    
+    
+    if model == 1:
+        logp += dnorm(eps,*parameter_prior_proposals[1,1])
+        logp += dnorm(sig,*parameter_prior_proposals[1,2])
+        logp += dnorm(L,*parameter_prior_proposals[1,3])
+        logp += dnorm(Q,*parameter_prior_proposals[1,4])
+    # OCM: no reason to use anything but uniform priors at this point.  Could probably narrow the prior ranges a little bit to improve acceptance,
+    #But Rich is rightly being conservative here especially since evaluations are cheap.
+    
+#    print(eps,sig)
+    #rhol_hat_fake = rhol_hat_models(T_lin,model,eps,sig)
+    rhol_hat = rhol_hat_models(T_rhol_data,model,eps,sig,L,Q) #[kg/m3]
+    Psat_hat = Psat_hat_models(T_Psat_data,model,eps,sig,L,Q) #[kPa]        
+ 
+    # Data likelihood
+    if properties == 'rhol':
+        logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
+        #logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
+    elif properties == 'Psat':
+        logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
+    elif properties == 'Multi':
+        logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
+        logp += sum(dnorm(Psat_data,Psat_hat,t_Psat**-2.))
+    return logp
+    #return rhol_hat
+
+
+
