@@ -27,7 +27,7 @@ n_points = 10
 # Select temperature range of data points to select, and how many temperatures within that range to use data at.
 
 
-thermo_data = filter_thermo_data(thermo_data, T_min, T_max, 10)
+thermo_data = filter_thermo_data(thermo_data, T_min, T_max, n_points)
 # Filter data to selected conditions.
 
 
@@ -114,8 +114,9 @@ unif = distributions.uniform.pdf
 
 # Select number of properties and which properties (current options are 'rhol','Psat', 'rhol+Psat','All')
 
-properties = 'rhol+Psat'
-number_criteria = 'two'
+# TODO: adjust this, since I depend on this when importing...
+properties = 'All'
+number_criteria = 'three'
 
 prior_range = 0.05
 
