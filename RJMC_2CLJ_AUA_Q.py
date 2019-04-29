@@ -43,7 +43,8 @@ thermo_data_SurfTens = np.asarray(thermo_data['SurfTens'])
 # Convert dictionaries to numpy arrays
 
 
-# Substantiate LennardJones class
+# Instantiate LennardJones class
+from LennardJones_2Center_correlations import LennardJones_2C
 compound_2CLJ = LennardJones_2C(M_w)
 
 '''
@@ -96,7 +97,8 @@ guess_1 = [1, *ff_params_ref[0]]
 guess_2 = [2, *ff_params_ref[2]]
 # Create initial starting points based on previous optimization data
 
-guess_2[3] = NIST_bondlength
+L_fixed = float(NIST_bondlength)
+guess_2[3] = float(L_fixed)
 # Modify Bond length for UA model to experimental value
 # guess_2 = [1,eps_lit3_AUA,sig_lit3_AUA,Lbond_lit3_AUA,Q_lit3_AUA]
 
@@ -139,6 +141,121 @@ L_prior = [ff_params_ref[1][2], ff_params_ref[1][2] / shape_divide]
 # Q_prior=[0,0.3]
 # Gamma
 Q_prior = [1, 0, 1]
+
+model_dims = [3, 4, 2]
+
+# Functions to sample from the prior for each model
+def sample_from_prior_model_0():
+    """Model 0: (eps, sig, L)
+    * Each from a logistic distribution prior
+    """
+    eps = distributions.logistic.rvs(*eps_prior)
+    sig = distributions.logistic.rvs(*sig_prior)
+    L = distributions.logistic.rvs(*L_prior)
+    return np.array([eps, sig, L])
+
+
+def sample_from_prior_model_1():
+    """Model 1: (eps, sig, L, Q)
+    * eps, sigma, L from a logistic distribution prior
+    * Q from a gamma distribution prior
+    """
+    eps = distributions.logistic.rvs(*eps_prior)
+    sig = distributions.logistic.rvs(*sig_prior)
+    L = distributions.logistic.rvs(*L_prior)
+    Q = distributions.gamma.rvs(*Q_prior)
+    return np.array([eps, sig, L, Q])
+
+
+def sample_from_prior_model_2():
+    """Model 2: (eps, sig)
+    * Each from a logistic distribution prior
+    """
+    eps = distributions.logistic.rvs(*eps_prior)
+    sig = distributions.logistic.rvs(*sig_prior)
+    return np.array([eps, sig])
+
+
+# Functions to evaluate the log prior pdf of each model
+def prior_log_pdf_model_0(theta):
+    """Model 0: (eps, sig, L)
+    * Each from a logistic distribution prior
+    """
+    assert (len(theta) == model_dims[0])
+    eps, sig, L = theta
+    return dlogit(eps, *eps_prior) + dlogit(sig, *sig_prior) + dlogit(L, *L_prior)
+
+
+def prior_log_pdf_model_1(theta):
+    """Model 1: (eps, sig, L, Q)
+    * eps, sigma, L from a logistic distribution prior
+    * Q from a gamma distribution prior
+    """
+    assert (len(theta) == model_dims[1])
+    eps, sig, L, Q = theta
+    return dlogit(eps, *eps_prior) + dlogit(sig, *sig_prior) + dlogit(L, *L_prior) + dgamma(Q, *Q_prior)
+
+
+def prior_log_pdf_model_2(theta):
+    """Model 2: (eps, sig)
+    * Each from a logistic distribution prior
+    """
+    assert (len(theta) == model_dims[2])
+    eps, sig = theta
+    return dlogit(eps, *eps_prior) + dlogit(sig, *sig_prior)
+
+
+# Functions to evaluate the log likelihood pdf of each model
+
+def parameter_unpacker(theta, model=0):
+    """Take variable-dimension theta and return fixed-length tuple(eps, sig, L, Q)"""
+    assert (len(theta) == model_dims[model])
+    if model == 0:
+        return (theta[0], theta[1], theta[2], 0)
+    elif model == 1:
+        return tuple(theta)
+    elif model == 2:
+        return (theta[0], theta[1], L_fixed, 0)
+
+
+def property_calculator_rhol(theta, model=0):
+    (eps, sig, L, Q) = parameter_unpacker(theta, model=model)
+    return rhol_hat_models(compound_2CLJ, thermo_data_rhoL[:, 0], model=model, eps=eps, sig=sig, L=L, Q=Q)  # [kg/m3]
+
+
+def property_calculator_Psat(theta, model=0):
+    (eps, sig, L, Q) = parameter_unpacker(theta, model=model)
+    return Psat_hat_models(compound_2CLJ, thermo_data_Pv[:, 0], model=model, eps=eps, sig=sig, L=L, Q=Q)  # [kPa]
+
+
+def property_calculator_SurfTens(theta, model=0):
+    (eps, sig, L, Q) = parameter_unpacker(theta, model=model)
+    return SurfTens_hat_models(compound_2CLJ, thermo_data_SurfTens[:, 0], model=model, eps=eps, sig=sig, L=Q, Q=Q)
+
+
+property_calculators = {
+    0: property_calculator_rhol,
+    1: property_calculator_Psat,
+    2: property_calculator_Psat,
+}
+
+log_likelihood_terms = {
+    0: lambda rhol_hat: sum(dnorm(thermo_data_rhoL[:, 1], rhol_hat, t_rhol ** -2.)),
+    1: lambda Psat_hat: sum(dnorm(thermo_data_Pv[:, 1], Psat_hat, t_Psat ** -2.)),
+    2: lambda SurfTens_hat: sum(dnorm(thermo_data_SurfTens[:, 1], SurfTens_hat, t_SurfTens ** -2)),
+}
+
+
+def likelihood_log_pdf_model_0(theta, properties=[0, 1, 2]):
+    return sum([log_likelihood_terms[i](property_calculators[i](theta, model=0)) for i in properties])
+
+
+def likelihood_log_pdf_model_1(theta, properties=[0, 1, 2]):
+    return sum([log_likelihood_terms[i](property_calculators[i](theta, model=1)) for i in properties])
+
+
+def likelihood_log_pdf_model_2(theta, properties=[0, 1, 2]):
+    return sum([log_likelihood_terms[i](property_calculators[i](theta, model=2)) for i in properties])
 
 
 def calc_posterior(model, eps, sig, L, Q):
