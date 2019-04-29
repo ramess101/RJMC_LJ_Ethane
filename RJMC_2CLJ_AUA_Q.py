@@ -10,9 +10,6 @@ Implementation of RJMC between AUA and AUA-Q models.
 
 from __future__ import division
 
-import copy
-from datetime import date
-
 from RJMC_auxiliary_functions import *
 
 # Here we have chosen ethane as the test case
@@ -47,38 +44,38 @@ thermo_data_SurfTens = np.asarray(thermo_data['SurfTens'])
 from LennardJones_2Center_correlations import LennardJones_2C
 compound_2CLJ = LennardJones_2C(M_w)
 
-'''
-# Epsilon and sigma can be obtained from the critical constants
-#eps_Tc = Ethane_LJ.calc_eps_Tc(Tc_RP) #[K]
-#sig_rhoc = Ethane_LJ.calc_sig_rhoc(rhoc_RP) #[nm]
+"""
+Epsilon and sigma can be obtained from the critical constants
+eps_Tc = Ethane_LJ.calc_eps_Tc(Tc_RP) #[K]
+sig_rhoc = Ethane_LJ.calc_sig_rhoc(rhoc_RP) #[nm]
 
 
-# Set percent uncertainty in each property
-# These values are to represent the simulation uncertainty more than the experimental uncertainty
-# Also, the transiton matrix for eps and sig for each model are tuned to this rhol uncertainty.
-# I.e. the optimal "lit" values agree well with a 3% uncertainty in rhol. This improved the RJMC model swap acceptance.
+Set percent uncertainty in each property
+These values are to represent the simulation uncertainty more than the experimental uncertainty
+Also, the transiton matrix for eps and sig for each model are tuned to this rhol uncertainty.
+I.e. the optimal "lit" values agree well with a 3% uncertainty in rhol. This improved the RJMC model swap acceptance.
 pu_rhol = 3
 pu_Psat = 5
 
-# I decided to include the same error model I am using for Mie lambda-6
-# For pu_rhol_low = 0.3 and pu_rhol_high = 0.5 AUA is 100%
-# For pu_rhol_low = 1 and pu_rhol_high = 3 LJ 16%, UA 22%, AUA 62%
-#pu_rhol_low = 1
-#T_rhol_switch = 230
-#pu_rhol_high = 3
-#
-#pu_Psat_low = 5
-#T_Psat_switch = 180
-#pu_Psat_high = 3
-#
-## Piecewise function to represent the uncertainty in rhol and Psat
-#pu_rhol = np.piecewise(T_rhol_data,[T_rhol_data<T_rhol_switch,T_rhol_data>=T_rhol_switch],[pu_rhol_low,lambda x:np.poly1d(np.polyfit([T_rhol_switch,T_max],[pu_rhol_low,pu_rhol_high],1))(x)])
-#pu_Psat = np.piecewise(T_Psat_data,[T_Psat_data<T_Psat_switch,T_Psat_data>=T_Psat_switch],[lambda x:np.poly1d(np.polyfit([T_min,T_Psat_switch],[pu_Psat_low,pu_Psat_high],1))(x),pu_Psat_high])
+I decided to include the same error model I am using for Mie lambda-6
+For pu_rhol_low = 0.3 and pu_rhol_high = 0.5 AUA is 100%
+For pu_rhol_low = 1 and pu_rhol_high = 3 LJ 16%, UA 22%, AUA 62%
+pu_rhol_low = 1
+T_rhol_switch = 230
+pu_rhol_high = 3
+
+pu_Psat_low = 5
+T_Psat_switch = 180
+pu_Psat_high = 3
+
+Piecewise function to represent the uncertainty in rhol and Psat
+pu_rhol = np.piecewise(T_rhol_data,[T_rhol_data<T_rhol_switch,T_rhol_data>=T_rhol_switch],[pu_rhol_low,lambda x:np.poly1d(np.polyfit([T_rhol_switch,T_max],[pu_rhol_low,pu_rhol_high],1))(x)])
+pu_Psat = np.piecewise(T_Psat_data,[T_Psat_data<T_Psat_switch,T_Psat_data>=T_Psat_switch],[lambda x:np.poly1d(np.polyfit([T_min,T_Psat_switch],[pu_Psat_low,pu_Psat_high],1))(x),pu_Psat_high])
   
-# Calculate the absolute uncertainty
-#u_rhol = rhol_data*pu_rhol/100.
-#u_Psat = Psat_data*pu_Psat/100.
-'''
+Calculate the absolute uncertainty
+u_rhol = rhol_data*pu_rhol/100.
+u_Psat = Psat_data*pu_Psat/100.
+"""
 
 # Calculate the estimated standard deviation
 sd_rhol = uncertainties['rhoL'] / 2.
@@ -286,7 +283,6 @@ def calc_posterior(model, eps, sig, L, Q):
     # Data likelihood: Compute likelihood based on gaussian penalty function
     if properties == 'rhol':
         logp += sum(dnorm(thermo_data_rhoL[:, 1], rhol_hat, t_rhol ** -2.))
-        # logp += sum(dnorm(rhol_data,rhol_hat,t_rhol**-2.))
     elif properties == 'Psat':
         logp += sum(dnorm(thermo_data_Pv[:, 1], Psat_hat, t_Psat ** -2.))
     elif properties == 'rhol+Psat':
@@ -297,7 +293,6 @@ def calc_posterior(model, eps, sig, L, Q):
         logp += sum(dnorm(thermo_data_Pv[:, 1], Psat_hat, t_Psat ** -2.))
         logp += sum(dnorm(thermo_data_SurfTens[:, 1], SurfTens_hat, t_SurfTens ** -2))
     return logp
-    # return rhol_hat
 
 
 def jacobian(n_models, n_params, w, lamda, opt_params_AUA, opt_params_AUA_Q, opt_params_2CLJ):
@@ -374,6 +369,7 @@ def gen_Tmatrix():
     #    print(bnd_LJ)
     #    print(bnd_UA)
     #    print(bnd_AUA)
+    from scipy.optimize import minimize
 
     opt_AUA = minimize(obj_AUA, guess_AUA, bounds=bnd_AUA)
     opt_AUA_Q = minimize(obj_AUA_Q, guess_AUA_Q, bounds=bnd_AUA_Q)
