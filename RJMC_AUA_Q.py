@@ -20,7 +20,8 @@ from scipy.stats import distributions
 from scipy.stats import linregress
 from scipy.optimize import minimize
 import random as rm
-from pymc3.stats import hpd
+#from pymc3.stats import hpd
+hpd = np.max
 from RJMC_auxiliary_functions import *
 from datetime import date
 
@@ -29,7 +30,7 @@ from datetime import date
 
 
 compound='O2'
-ff_params_ref,Tc_lit,M_w,thermo_data=parse_data_ffs(compound)
+ff_params_ref,Tc_lit,M_w,thermo_data,NIST_bondlength=parse_data_ffs(compound)
 #Retrieve force field literature values, constants, and thermo data
 
 T_min = 0.55*Tc_lit[0]
