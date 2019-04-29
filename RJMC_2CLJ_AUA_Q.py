@@ -642,218 +642,218 @@ def parameter_proposal(params, n_params, prop_sd):
 
     return params, proposed_log_prob
 
+if __name__ == '__main__':
+    guess_params = np.zeros((3, np.size(guess_0)))
+    guess_params[0, :] = guess_0
+    guess_params[1, :] = guess_1
+    guess_params[2, :] = guess_2
 
-guess_params = np.zeros((3, np.size(guess_0)))
-guess_params[0, :] = guess_0
-guess_params[1, :] = guess_1
-guess_params[2, :] = guess_2
+    initial_sd = [1, 2, 0.01, 0.01, 0.5]
+    guess_sd = np.zeros((3, np.size(guess_0)))
+    guess_sd[0, :] = initial_sd
+    guess_sd[1, :] = initial_sd
+    guess_sd[2, :] = initial_sd
+    n_models = 3
 
-initial_sd = [1, 2, 0.01, 0.01, 0.5]
-guess_sd = np.zeros((3, np.size(guess_0)))
-guess_sd[0, :] = initial_sd
-guess_sd[1, :] = initial_sd
-guess_sd[2, :] = initial_sd
-n_models = 3
+    '''
+    def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
+        swap_freq=0.0
+        n_iter=200000
+        tune_freq=100
+        tune_for=10000
+        parameter_prior_proposal=np.empty((n_models,np.size(guess_params,1),2))
+    
+        for i in range(1,n_models):
+            initial_values=guess_params[i,:]
+            initial_sd=guess_sd[i,:]
+            trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,1,1,1,1,1)
+            trace_tuned = trace[tune_for:]
+            max_ap=np.zeros(np.size(trace_tuned,1))
+            map_CI=np.zeros((np.size(trace_tuned,1),2))
+    
+            for j in range(np.size(trace_tuned,1)):
+                bins,values=np.histogram(trace_tuned[:,j],bins=100)
+                max_ap[j]=(values[np.argmax(bins)+1]+values[np.argmax(bins)])/2
+                map_CI[j]=hpd(trace_tuned[:,j],alpha=0.05)
+                sigma_hat=np.sqrt(map_CI[j,1]-map_CI[j,0])/(2*1.96)
+                parameter_prior_proposal[i,j]=[max_ap[j],sigma_hat]
+        return parameter_prior_proposal,trace_tuned
+    
+    
+    
+    #parameter_prior_proposals,trace_tuned=mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd)
+    '''
 
-'''
-def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
-    swap_freq=0.0
-    n_iter=200000
-    tune_freq=100
-    tune_for=10000
-    parameter_prior_proposal=np.empty((n_models,np.size(guess_params,1),2))
+    guess_test = [1, 60, 0.2, 0.3, 0.02]
+    initial_values = guess_test  # Can use critical constants
+    initial_sd = np.asarray(initial_values) / 100
 
-    for i in range(1,n_models):
-        initial_values=guess_params[i,:]
-        initial_sd=guess_sd[i,:]
-        trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,1,1,1,1,1)
-        trace_tuned = trace[tune_for:]
-        max_ap=np.zeros(np.size(trace_tuned,1))
-        map_CI=np.zeros((np.size(trace_tuned,1),2))
+    n_iter = 1000000
+    # Number of iterations.  Should get decent results at 10^6, better at 10^7 (but takes like 3-5 hours)
 
-        for j in range(np.size(trace_tuned,1)):
-            bins,values=np.histogram(trace_tuned[:,j],bins=100)
-            max_ap[j]=(values[np.argmax(bins)+1]+values[np.argmax(bins)])/2
-            map_CI[j]=hpd(trace_tuned[:,j],alpha=0.05)
-            sigma_hat=np.sqrt(map_CI[j,1]-map_CI[j,0])/(2*1.96)
-            parameter_prior_proposal[i,j]=[max_ap[j],sigma_hat]
-    return parameter_prior_proposal,trace_tuned
+    tune_freq = 100
+    tune_for = 10000
+    # Tuning params
 
+    n_models = 3
+    # Number of models considered
 
-
-#parameter_prior_proposals,trace_tuned=mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd)
-'''
-
-guess_test = [1, 60, 0.2, 0.3, 0.02]
-initial_values = guess_test  # Can use critical constants
-initial_sd = np.asarray(initial_values) / 100
-
-n_iter = 1000000
-# Number of iterations.  Should get decent results at 10^6, better at 10^7 (but takes like 3-5 hours)
-
-tune_freq = 100
-tune_for = 10000
-# Tuning params
-
-n_models = 3
-# Number of models considered
-
-swap_freq = 0.1
-# Frequency of proposed model swaps. Best to keep below 0.2
-# Definitely a tradeoff between too low (slow convergence of sampling ratio) and too high (poor sampling in general).  Have found 0.05-0.1 to be good
-
-
-print('Compound: ' + compound)
-print('Properties: ' + properties)
-print('MCMC Steps: ' + str(n_iter))
-
-trace, logp_trace, percent_deviation_trace, attempt_matrix, acceptance_matrix, prop_sd, accept_vector = RJMC_outerloop(
-    calc_posterior, n_iter, initial_values, initial_sd, n_models, swap_freq, tune_freq, tune_for, jacobian,
-    transition_function, opt_params_AUA, opt_params_AUA_Q, opt_params_2CLJ)
-# Initiate sampling!
+    swap_freq = 0.1
+    # Frequency of proposed model swaps. Best to keep below 0.2
+    # Definitely a tradeoff between too low (slow convergence of sampling ratio) and too high (poor sampling in general).  Have found 0.05-0.1 to be good
 
 
-# %%
-# POST PROCESSING
+    print('Compound: ' + compound)
+    print('Properties: ' + properties)
+    print('MCMC Steps: ' + str(n_iter))
 
-print('Attempted Moves')
-print(attempt_matrix)
-print('Accepted Moves')
-print(acceptance_matrix)
-prob_matrix = acceptance_matrix / attempt_matrix
-transition_matrix = np.ones((3, 3))
-transition_matrix[0, 1] = acceptance_matrix[0, 1] / np.sum(attempt_matrix, 1)[0]
-transition_matrix[0, 2] = acceptance_matrix[0, 2] / np.sum(attempt_matrix, 1)[0]
-transition_matrix[1, 0] = acceptance_matrix[1, 0] / np.sum(attempt_matrix, 1)[1]
-transition_matrix[1, 2] = acceptance_matrix[1, 2] / np.sum(attempt_matrix, 1)[1]
-transition_matrix[2, 1] = acceptance_matrix[2, 1] / np.sum(attempt_matrix, 1)[2]
-transition_matrix[2, 0] = acceptance_matrix[2, 0] / np.sum(attempt_matrix, 1)[2]
-transition_matrix[0, 0] = 1 - transition_matrix[0, 1] - transition_matrix[0, 2]
-transition_matrix[1, 1] = 1 - transition_matrix[1, 0] - transition_matrix[1, 2]
-transition_matrix[2, 2] = 1 - transition_matrix[2, 0] - transition_matrix[2, 1]
-print('Transition Matrix:')
-print(transition_matrix)
-trace_tuned = trace[tune_for:]
-trace_tuned[:, 2:] *= 10
-percent_deviation_trace_tuned = percent_deviation_trace[tune_for:]
-model_params = trace_tuned[0, :]
+    trace, logp_trace, percent_deviation_trace, attempt_matrix, acceptance_matrix, prop_sd, accept_vector = RJMC_outerloop(
+        calc_posterior, n_iter, initial_values, initial_sd, n_models, swap_freq, tune_freq, tune_for, jacobian,
+        transition_function, opt_params_AUA, opt_params_AUA_Q, opt_params_2CLJ)
+    # Initiate sampling!
 
-fname = compound + 'test2_nomap' + '_' + properties + '_' + str(n_points) + '_' + str(n_iter) + '_' + str(date.today())
 
-lit_params, lit_devs = import_literature_values(number_criteria, compound)
-# new_lit_devs=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],lit_devs,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
+    # %%
+    # POST PROCESSING
 
-# %%
-new_lit_devs = recompute_lit_percent_devs(lit_params, computePercentDeviations, thermo_data_rhoL[:, 0],
-                                          thermo_data_Pv[:, 0], thermo_data_SurfTens[:, 0], lit_devs,
-                                          thermo_data_rhoL[:, 1], thermo_data_Pv[:, 1], thermo_data_SurfTens[:, 1],
-                                          Tc_lit[0], rhol_hat_models, Psat_hat_models, SurfTens_hat_models,
-                                          T_c_hat_models, compound_2CLJ)
-pareto_point, pareto_point_values = findParetoPoints(percent_deviation_trace_tuned, trace_tuned, 0)
+    print('Attempted Moves')
+    print(attempt_matrix)
+    print('Accepted Moves')
+    print(acceptance_matrix)
+    prob_matrix = acceptance_matrix / attempt_matrix
+    transition_matrix = np.ones((3, 3))
+    transition_matrix[0, 1] = acceptance_matrix[0, 1] / np.sum(attempt_matrix, 1)[0]
+    transition_matrix[0, 2] = acceptance_matrix[0, 2] / np.sum(attempt_matrix, 1)[0]
+    transition_matrix[1, 0] = acceptance_matrix[1, 0] / np.sum(attempt_matrix, 1)[1]
+    transition_matrix[1, 2] = acceptance_matrix[1, 2] / np.sum(attempt_matrix, 1)[1]
+    transition_matrix[2, 1] = acceptance_matrix[2, 1] / np.sum(attempt_matrix, 1)[2]
+    transition_matrix[2, 0] = acceptance_matrix[2, 0] / np.sum(attempt_matrix, 1)[2]
+    transition_matrix[0, 0] = 1 - transition_matrix[0, 1] - transition_matrix[0, 2]
+    transition_matrix[1, 1] = 1 - transition_matrix[1, 0] - transition_matrix[1, 2]
+    transition_matrix[2, 2] = 1 - transition_matrix[2, 0] - transition_matrix[2, 1]
+    print('Transition Matrix:')
+    print(transition_matrix)
+    trace_tuned = trace[tune_for:]
+    trace_tuned[:, 2:] *= 10
+    percent_deviation_trace_tuned = percent_deviation_trace[tune_for:]
+    model_params = trace_tuned[0, :]
 
-'''
-max_ap = np.zeros(np.size(model_params))
-map_CI = np.zeros((np.size(model_params),2))
-for i in range(np.size(model_params)):
-    bins,values=np.histogram(trace_tuned[:,i],bins=100,density=True)
-    max_ap[i]=(values[np.argmax(bins)+1]+values[np.argmax(bins)])/2
-    map_CI[i]=hpd(trace_tuned[:,i],alpha=0.05)
-    plt.hist(trace_tuned[:,i],bins=100,label='Sampled Posterior',density='True'),plt.axvline(x=map_CI[i][0],color='red',label='HPD 95% CI',ls='--'),plt.axvline(x=map_CI[i][1],color='red',ls='--'),plt.axvline(x=max_ap[i],color='orange',lw=1,label='MAP Estimate')
-    plt.axvline(x=initial_values[i],color='magenta',label='Literature/Initial Value')
+    fname = compound + 'test2_nomap' + '_' + properties + '_' + str(n_points) + '_' + str(n_iter) + '_' + str(date.today())
+
+    lit_params, lit_devs = import_literature_values(number_criteria, compound)
+    # new_lit_devs=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],lit_devs,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
+
+    # %%
+    new_lit_devs = recompute_lit_percent_devs(lit_params, computePercentDeviations, thermo_data_rhoL[:, 0],
+                                              thermo_data_Pv[:, 0], thermo_data_SurfTens[:, 0], lit_devs,
+                                              thermo_data_rhoL[:, 1], thermo_data_Pv[:, 1], thermo_data_SurfTens[:, 1],
+                                              Tc_lit[0], rhol_hat_models, Psat_hat_models, SurfTens_hat_models,
+                                              T_c_hat_models, compound_2CLJ)
+    pareto_point, pareto_point_values = findParetoPoints(percent_deviation_trace_tuned, trace_tuned, 0)
+
+    '''
+    max_ap = np.zeros(np.size(model_params))
+    map_CI = np.zeros((np.size(model_params),2))
+    for i in range(np.size(model_params)):
+        bins,values=np.histogram(trace_tuned[:,i],bins=100,density=True)
+        max_ap[i]=(values[np.argmax(bins)+1]+values[np.argmax(bins)])/2
+        map_CI[i]=hpd(trace_tuned[:,i],alpha=0.05)
+        plt.hist(trace_tuned[:,i],bins=100,label='Sampled Posterior',density='True'),plt.axvline(x=map_CI[i][0],color='red',label='HPD 95% CI',ls='--'),plt.axvline(x=map_CI[i][1],color='red',ls='--'),plt.axvline(x=max_ap[i],color='orange',lw=1,label='MAP Estimate')
+        plt.axvline(x=initial_values[i],color='magenta',label='Literature/Initial Value')
+        plt.legend()
+        plt.show()
+    max_ap[0]=np.floor(max_ap[0])
+    plotPercentDeviations(percent_deviation_trace_tuned,pareto_point,'MCMC Points','Pareto Point')
+    
+    
+    
+    
+    plotDeviationHistogram(percent_deviation_trace_tuned,pareto_point)
+    '''
+    # Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
+    model_count = np.array([len(trace_tuned[trace_tuned[:, 0] == 0]), len(trace_tuned[trace_tuned[:, 0] == 1]),
+                            len(trace_tuned[trace_tuned[:, 0] == 2])])
+
+    prob_0 = 1. * model_count[0] / (n_iter - tune_for + 1)
+    print('Percent that  model 0 is sampled: ' + str(prob_0 * 100.))  # The percent that use 1 parameter model
+
+    prob_1 = 1. * model_count[1] / (n_iter - tune_for + 1)
+    print('Percent that model 1 is sampled: ' + str(prob_1 * 100.))  # The percent that use two center UA LJ
+
+    prob_2 = 1. * model_count[2] / (n_iter - tune_for + 1)
+    print('Percent that model 2 is sampled: ' + str(prob_2 * 100.))  # The percent that use two center UA LJ
+
+    prob = [prob_0, prob_1, prob_2]
+
+    Exp_ratio = prob_0 / prob_1
+
+    plot_bar_chart(prob, fname, properties, compound, n_iter, n_models)
+
+    create_percent_dev_triangle_plot(percent_deviation_trace_tuned, fname, 'percent_dev_trace', new_lit_devs, prob,
+                                     properties, compound, n_iter)
+
+    # print('Analytical sampling ratio: %2.3f' % ratio)
+    print('Experimental sampling ratio: %2.3f' % Exp_ratio)
+
+    print('Detailed Balance')
+
+    # These sets of numbers should be roughly equal to each other (If both models are sampled).  If not, big problem
+
+    print(prob_0 * transition_matrix[0, 1])
+    print(prob_1 * transition_matrix[1, 0])
+
+    print(prob_0 * transition_matrix[0, 2])
+    print(prob_2 * transition_matrix[2, 0])
+
+    print(prob_1 * transition_matrix[1, 2])
+    print(prob_2 * transition_matrix[2, 1])
+
+    # trace_tuned=np.load('trace/trace_C2H6_All_10_50000000_2019-03-08.npy')
+
+    trace_model_0 = []
+    trace_model_1 = []
+    trace_model_2 = []
+    log_trace_0 = []
+    log_trace_1 = []
+    log_trace_2 = []
+
+    # Initiate data frames for separating model traces
+
+    plt.plot(logp_trace, label='Log Posterior')
     plt.legend()
     plt.show()
-max_ap[0]=np.floor(max_ap[0])
-plotPercentDeviations(percent_deviation_trace_tuned,pareto_point,'MCMC Points','Pareto Point')
+
+    plt.plot(trace[:, 0])
+
+    np.save('trace/trace_' + fname + '.npy', trace_tuned)
+    np.save('logprob/logprob_' + fname + '.npy', logp_trace)
+    np.save('percent_dev/percent_dev_' + fname + '.npy', percent_deviation_trace_tuned)
+    # Save trajectories (can be disabled since they are big files)
 
 
+    for i in range(np.size(trace_tuned, 0)):
+        if trace_tuned[i, 0] == 0:
+            trace_model_0.append(trace_tuned[i])
+            # log_trace_0.append(logp_trace[i])
+        elif trace_tuned[i, 0] == 1:
+            trace_model_1.append(trace_tuned[i])
+            # log_trace_1.append(logp_trace[i])
+        elif trace_tuned[i, 0] == 2:
+            trace_model_2.append(trace_tuned[i])
+            # log_trace_2.append(logp_trace[i])
 
+    trace_model_0 = np.asarray(trace_model_0)
+    trace_model_1 = np.asarray(trace_model_1)
+    trace_model_2 = np.asarray(trace_model_2)
 
-plotDeviationHistogram(percent_deviation_trace_tuned,pareto_point)
-'''
-# Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
-model_count = np.array([len(trace_tuned[trace_tuned[:, 0] == 0]), len(trace_tuned[trace_tuned[:, 0] == 1]),
-                        len(trace_tuned[trace_tuned[:, 0] == 2])])
+    create_param_triangle_plot_4D(trace_model_0, fname, 'trace_model_0', lit_params, properties, compound, n_iter,
+                                  sig_prior, eps_prior, L_prior, Q_prior)
+    create_param_triangle_plot_4D(trace_model_1, fname, 'trace_model_1', lit_params, properties, compound, n_iter,
+                                  sig_prior, eps_prior, L_prior, Q_prior)
+    create_param_triangle_plot_4D(trace_model_2, fname, 'trace_model_2', lit_params, properties, compound, n_iter,
+                                  sig_prior, eps_prior, L_prior, Q_prior)
 
-prob_0 = 1. * model_count[0] / (n_iter - tune_for + 1)
-print('Percent that  model 0 is sampled: ' + str(prob_0 * 100.))  # The percent that use 1 parameter model
+    # Plot parameters
 
-prob_1 = 1. * model_count[1] / (n_iter - tune_for + 1)
-print('Percent that model 1 is sampled: ' + str(prob_1 * 100.))  # The percent that use two center UA LJ
-
-prob_2 = 1. * model_count[2] / (n_iter - tune_for + 1)
-print('Percent that model 2 is sampled: ' + str(prob_2 * 100.))  # The percent that use two center UA LJ
-
-prob = [prob_0, prob_1, prob_2]
-
-Exp_ratio = prob_0 / prob_1
-
-plot_bar_chart(prob, fname, properties, compound, n_iter, n_models)
-
-create_percent_dev_triangle_plot(percent_deviation_trace_tuned, fname, 'percent_dev_trace', new_lit_devs, prob,
-                                 properties, compound, n_iter)
-
-# print('Analytical sampling ratio: %2.3f' % ratio)
-print('Experimental sampling ratio: %2.3f' % Exp_ratio)
-
-print('Detailed Balance')
-
-# These sets of numbers should be roughly equal to each other (If both models are sampled).  If not, big problem
-
-print(prob_0 * transition_matrix[0, 1])
-print(prob_1 * transition_matrix[1, 0])
-
-print(prob_0 * transition_matrix[0, 2])
-print(prob_2 * transition_matrix[2, 0])
-
-print(prob_1 * transition_matrix[1, 2])
-print(prob_2 * transition_matrix[2, 1])
-
-# trace_tuned=np.load('trace/trace_C2H6_All_10_50000000_2019-03-08.npy')
-
-trace_model_0 = []
-trace_model_1 = []
-trace_model_2 = []
-log_trace_0 = []
-log_trace_1 = []
-log_trace_2 = []
-
-# Initiate data frames for separating model traces
-
-plt.plot(logp_trace, label='Log Posterior')
-plt.legend()
-plt.show()
-
-plt.plot(trace[:, 0])
-
-np.save('trace/trace_' + fname + '.npy', trace_tuned)
-np.save('logprob/logprob_' + fname + '.npy', logp_trace)
-np.save('percent_dev/percent_dev_' + fname + '.npy', percent_deviation_trace_tuned)
-# Save trajectories (can be disabled since they are big files)
-
-
-for i in range(np.size(trace_tuned, 0)):
-    if trace_tuned[i, 0] == 0:
-        trace_model_0.append(trace_tuned[i])
-        # log_trace_0.append(logp_trace[i])
-    elif trace_tuned[i, 0] == 1:
-        trace_model_1.append(trace_tuned[i])
-        # log_trace_1.append(logp_trace[i])
-    elif trace_tuned[i, 0] == 2:
-        trace_model_2.append(trace_tuned[i])
-        # log_trace_2.append(logp_trace[i])
-
-trace_model_0 = np.asarray(trace_model_0)
-trace_model_1 = np.asarray(trace_model_1)
-trace_model_2 = np.asarray(trace_model_2)
-
-create_param_triangle_plot_4D(trace_model_0, fname, 'trace_model_0', lit_params, properties, compound, n_iter,
-                              sig_prior, eps_prior, L_prior, Q_prior)
-create_param_triangle_plot_4D(trace_model_1, fname, 'trace_model_1', lit_params, properties, compound, n_iter,
-                              sig_prior, eps_prior, L_prior, Q_prior)
-create_param_triangle_plot_4D(trace_model_2, fname, 'trace_model_2', lit_params, properties, compound, n_iter,
-                              sig_prior, eps_prior, L_prior, Q_prior)
-
-# Plot parameters
-
-get_metadata(compound, properties, sig_prior, eps_prior, L_prior, Q_prior, n_iter, swap_freq, n_points,
-             transition_matrix, prob, attempt_matrix, acceptance_matrix)
+    get_metadata(compound, properties, sig_prior, eps_prior, L_prior, Q_prior, n_iter, swap_freq, n_points,
+                 transition_matrix, prob, attempt_matrix, acceptance_matrix)
