@@ -18,7 +18,6 @@ from scipy.stats import distributions
 from scipy.stats import linregress
 from scipy.optimize import minimize
 import random as rm
-from pymc3.stats import hpd
 import matplotlib.patches as mpatches
 from datetime import datetime,date
 import copy
@@ -328,8 +327,8 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         axs[2,2].axvline(x=L_prior[0],color='r',linestyle='--')
         axs[2,2].axvline(x=L_prior[1],color='r',linestyle='--')
         '''
-        axs[3,3].axvline(x=Q_prior[0],color='r',linestyle='--')
-        axs[3,3].axvline(x=Q_prior[1],color='r',linestyle='--')
+        #axs[3,3].axvline(x=Q_prior[0],color='r',linestyle='--')
+        #axs[3,3].axvline(x=Q_prior[1],color='r',linestyle='--')
         
         
 
@@ -406,8 +405,8 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         handles0,labels0 = axs[0,0].get_legend_handles_labels()
         #plt.figlegend((label0,label1),('Literature','RJMC Sampling'))
         fig.legend(handles,labels,loc=[0.1,0.4])
-        plt.savefig('triangle_plots/'+fname+tracename+'.png')
-        #plt.show()
+        #plt.savefig('triangle_plots/'+fname+tracename+'.png')
+        plt.show()
     return
         
         
@@ -491,8 +490,8 @@ def create_percent_dev_triangle_plot(trace,fname,tracename,lit_values,prob,prope
     handles,labels = axs[0,1].get_legend_handles_labels()
     fig.legend(handles,labels,loc=[0.05,0.3])
     
-    plt.savefig('triangle_plots/'+fname+tracename+'.png')
-    #plt.show()
+    #plt.savefig('triangle_plots/'+fname+tracename+'.png')
+    plt.show()
 
 
 def import_literature_values(criteria,compound):
@@ -530,8 +529,8 @@ def plot_bar_chart(prob,filename,properties,compound,n_iter,n_models):
     plt.title('Model Bayes Factor, '+compound+', '+properties+', '+str(n_iter)+' steps',fontsize=14)
     plt.ylabel('Bayes Factor',fontsize=14)
     
-    plt.savefig('bar_charts/bayes_factor'+filename+'.png')
-    #plt.show()
+    #plt.savefig('bar_charts/bayes_factor'+filename+'.png')
+    plt.show()
     return
 
 def recompute_lit_percent_devs(lit_values,computePercentDeviations,temp_values_rhol,temp_values_psat,temp_values_surftens,parameter_values,rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models,compound_2CLJ):
