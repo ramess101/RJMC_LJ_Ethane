@@ -133,12 +133,17 @@ eps_prior = [ff_params_ref[1][0], ff_params_ref[1][0] / shape_divide]
 sig_prior = [ff_params_ref[1][1], ff_params_ref[1][1] / shape_divide]
 L_prior = [ff_params_ref[1][2], ff_params_ref[1][2] / shape_divide]
 
+print('eps_prior: ', eps_prior)
+print('sig_prior: ', sig_prior)
+print('L_prior: ', L_prior)
+
 # Q priors
 # Can use uniform or gamma prior
 # Uniform
 # Q_prior=[0,0.3]
 # Gamma
 Q_prior = [1, 0, 1]
+print('Q_prior: ', Q_prior)
 
 model_dims = [3, 4, 2]
 
@@ -216,19 +221,22 @@ def parameter_unpacker(theta, model=0):
         return (theta[0], theta[1], L_fixed, 0)
 
 
+def nan_safe(x):
+    return np.nan_to_num(x) + (np.isnan(x) * 10000.0)
+
 def property_calculator_rhol(theta, model=0):
     (eps, sig, L, Q) = parameter_unpacker(theta, model=model)
-    return rhol_hat_models(compound_2CLJ, thermo_data_rhoL[:, 0], model=model, eps=eps, sig=sig, L=L, Q=Q)  # [kg/m3]
+    return nan_safe(rhol_hat_models(compound_2CLJ, thermo_data_rhoL[:, 0], model=model, eps=eps, sig=sig, L=L, Q=Q))  # [kg/m3]
 
 
 def property_calculator_Psat(theta, model=0):
     (eps, sig, L, Q) = parameter_unpacker(theta, model=model)
-    return Psat_hat_models(compound_2CLJ, thermo_data_Pv[:, 0], model=model, eps=eps, sig=sig, L=L, Q=Q)  # [kPa]
+    return nan_safe(Psat_hat_models(compound_2CLJ, thermo_data_Pv[:, 0], model=model, eps=eps, sig=sig, L=L, Q=Q))  # [kPa]
 
 
 def property_calculator_SurfTens(theta, model=0):
     (eps, sig, L, Q) = parameter_unpacker(theta, model=model)
-    return SurfTens_hat_models(compound_2CLJ, thermo_data_SurfTens[:, 0], model=model, eps=eps, sig=sig, L=Q, Q=Q)
+    return nan_safe(SurfTens_hat_models(compound_2CLJ, thermo_data_SurfTens[:, 0], model=model, eps=eps, sig=sig, L=Q, Q=Q))
 
 
 property_calculators = {
