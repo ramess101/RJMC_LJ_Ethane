@@ -234,7 +234,7 @@ def property_calculator_SurfTens(theta, model=0):
 property_calculators = {
     0: property_calculator_rhol,
     1: property_calculator_Psat,
-    2: property_calculator_Psat,
+    2: property_calculator_SurfTens,
 }
 
 log_likelihood_terms = {
