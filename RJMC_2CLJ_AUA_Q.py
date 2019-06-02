@@ -24,7 +24,8 @@ from pymc3.stats import hpd
 from RJMC_auxiliary_functions import *
 from datetime import date
 import copy
-
+from pymbar import BAR,timeseries
+import random
 
 # Here we have chosen ethane as the test case
 
@@ -36,12 +37,12 @@ ff_params_ref,Tc_lit,M_w,thermo_data,NIST_bondlength=parse_data_ffs(compound)
 
 T_min = 0.55*Tc_lit[0]
 T_max = 0.95*Tc_lit[0]
-n_points=10
+n_points=40
 
 #Select temperature range of data points to select, and how many temperatures within that range to use data at. 
 
 
-thermo_data=filter_thermo_data(thermo_data,T_min,T_max,10)
+thermo_data=filter_thermo_data(thermo_data,T_min,T_max,n_points)
 #Filter data to selected conditions.
 
 
@@ -120,6 +121,10 @@ dgamma = distributions.gamma.logpdf
 duni = distributions.uniform.logpdf
 dlogit = distributions.logistic.logpdf
 
+gammarvs=distributions.gamma.rvs
+logitrvs=distributions.logistic.rvs
+uniformrvs=distributions.uniform.rvs
+
 rnorm = np.random.normal
 runif = np.random.rand
 
@@ -153,7 +158,7 @@ L_prior=[ff_params_ref[1][2],ff_params_ref[1][2]/shape_divide]
 #Uniform
 #Q_prior=[0,0.3]
 #Gamma
-Q_prior=[1,0,1]
+Q_prior=[1,0,0.5]
 
 def calc_posterior(model,eps,sig,L,Q):
 
@@ -310,6 +315,11 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     acceptance_matrix=np.zeros((n_models,n_models))
     
     
+    alpha_vector_01=[]
+    alpha_vector_10=[]
+    alpha_vector_02=[]
+    alpha_vector_20=[]
+    
     # Initialize trace for parameters
     trace = np.zeros((n_iterations+1, n_params)) #n_iterations + 1 to account for guess
     logp_trace = np.zeros(n_iterations+1)
@@ -340,9 +350,18 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
         if i >= tune_for:
             record_acceptance='True'
         
-        new_params, new_log_prob, attempt_matrix,acceptance_matrix,acceptance = RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix,jacobian,transition_function,record_acceptance,opt_params_AUA,opt_params_AUA_Q,opt_params_2CLJ)
+        new_params, new_log_prob, attempt_matrix,acceptance_matrix,acceptance,alpha,model_swap_attempt,model_swap_type = RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix,jacobian,transition_function,record_acceptance,opt_params_AUA,opt_params_AUA_Q,opt_params_2CLJ)
         #Propose and do an RJMC move (either of parameter or model type, and record the outcome)
         
+        if model_swap_attempt=='True':
+            if model_swap_type=='01':
+                alpha_vector_01.append(alpha)
+            elif model_swap_type=='10':
+                alpha_vector_10.append(alpha)
+            elif model_swap_type=='02':
+                alpha_vector_02.append(alpha)            
+            elif model_swap_type=='20':
+                alpha_vector_20.append(alpha)        
         
         if acceptance == 'True':
             accept_vector[i]=1
@@ -364,9 +383,10 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
                     prop_sd[m+1] *= 1.1
                     #print('No')         
            
-            
-    return trace,logp_trace, percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector
-
+    
+    alpha_matrix=np.asarray([np.asarray(alpha_vector_01),np.asarray(alpha_vector_10),np.asarray(alpha_vector_02),np.asarray(alpha_vector_20)])
+    
+    return trace,logp_trace, percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector,alpha_matrix
 
 def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,n_params,prop_sd,attempt_matrix,acceptance_matrix,jacobian,transition_function,record_acceptance,opt_params_AUA,opt_params_AUA_Q,opt_params_2CLJ):
     
@@ -377,6 +397,8 @@ def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,
     #Roll a dice to decide what kind of move will be suggested
     mov_ran=np.random.random()
     
+    model_swap_attempt='False'
+    model_swap_type='null'
     
     #swap_freq = Frequency that jumps between models are proposed.  Probably should not be set higher than 0.2 (model swaps are not accepted very often and doing a high percentage of them leads to poor sampling)   
     if mov_ran <= swap_freq:
@@ -386,8 +408,12 @@ def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,
         
         alpha = (proposed_log_prob - current_log_prob) + np.log(rjmc_jacobian) + np.log(transition_function)
         
+        BAR_ratio = (proposed_log_prob - current_log_prob) + np.log(rjmc_jacobian)
         acceptance=accept_reject(alpha)
         #Accept or reject proposal and record new parameters/metadata
+        
+        model_swap_attempt='True'
+        model_swap_type=str(proposed_model)+str(current_model)
         
         if acceptance =='True':
             new_log_prob=proposed_log_prob
@@ -406,7 +432,7 @@ def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,
         params,proposed_log_prob=parameter_proposal(params,n_params,prop_sd)    
         
         alpha = (proposed_log_prob - current_log_prob)
-    
+        BAR_ratio=0
         acceptance=accept_reject(alpha)
         #Accept or reject proposal and record new parameters/metadata
     
@@ -423,7 +449,7 @@ def RJMC_Moves(current_params,current_model,current_log_prob,n_models,swap_freq,
                 attempt_matrix[current_model,current_model]+=1
     
                    
-    return new_params,new_log_prob,attempt_matrix,acceptance_matrix,acceptance
+    return new_params,new_log_prob,attempt_matrix,acceptance_matrix,acceptance,-BAR_ratio,model_swap_attempt,model_swap_type 
 
 def accept_reject(alpha):    
     urv=runif()
@@ -524,7 +550,8 @@ def parameter_proposal(params,n_params,prop_sd):
         proposed_param=int(np.ceil(np.random.random()*(n_params-1)))
     elif params[0] == 2:
         proposed_param=int(np.ceil(np.random.random()*(n_params-3)))
-        
+    
+   
         
     params[proposed_param] = rnorm(params[proposed_param], prop_sd[proposed_param])
     proposed_log_prob=calc_posterior(*params)
@@ -573,22 +600,38 @@ def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
 
 #parameter_prior_proposals,trace_tuned=mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd)
 '''
+n_models=3
+#Number of models considered
+
+guess_test=[1,91.4,0.363,0.148,0]
 
 
-guess_test=[1,60,0.2,0.3,0.02]
-initial_values=guess_test # Can use critical constants
+initial_values=np.empty(5)
+#randomly generate initial values from prior distributions
+
+initial_values=np.asarray([random.randint(0,n_models-1),logitrvs(*eps_prior),logitrvs(*sig_prior),logitrvs(*L_prior),gammarvs(*Q_prior)])
+
+if initial_values[0]==0:
+    initial_values[4]=0
+elif initial_values[0]==2:
+    initial_values[3]=NIST_bondlength
+    initial_values[4]=0
+print(initial_values)
+    
+
+
+#guess_1 # Can use critical constants
 initial_sd = np.asarray(initial_values)/100
 
 
-n_iter=1000000
+n_iter=100000
 #Number of iterations.  Should get decent results at 10^6, better at 10^7 (but takes like 3-5 hours)
 
 tune_freq=100
 tune_for=10000
 #Tuning params
 
-n_models=3
-#Number of models considered
+
 
 swap_freq=0.1
 #Frequency of proposed model swaps. Best to keep below 0.2
@@ -600,7 +643,7 @@ print('Properties: '+properties)
 print('MCMC Steps: '+str(n_iter))
 
 
-trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,opt_params_AUA,opt_params_AUA_Q,opt_params_2CLJ)
+trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector,alpha_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,opt_params_AUA,opt_params_AUA_Q,opt_params_2CLJ)
 #Initiate sampling!
 
 
@@ -629,7 +672,9 @@ trace_tuned[:,2:]*=10
 percent_deviation_trace_tuned = percent_deviation_trace[tune_for:]
 model_params = trace_tuned[0,:]
 
-fname=compound+'test2_nomap'+'_'+properties+'_'+str(n_points)+'_'+str(n_iter)+'_'+str(date.today())
+
+
+fname=compound+'likelihood_data_amount_10'+'_'+properties+'_'+str(n_points)+'_'+str(n_iter)+'_'+str(date.today())
 
 lit_params,lit_devs=import_literature_values(number_criteria,compound)
 #new_lit_devs=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],lit_devs,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
@@ -675,6 +720,15 @@ prob=[prob_0,prob_1,prob_2]
 
 Exp_ratio=prob_0/prob_1
 
+'''
+BAR_estimate=BAR(np.asarray(alpha_vector[0]),alpha_vector[1])
+
+BF_BAR=np.exp(-BAR_estimate[0])
+BF_BAR_LB=np.exp(-(BAR_estimate[0]+BAR_estimate[1]))
+BF_BAR_UB=np.exp(-(BAR_estimate[0]-BAR_estimate[1]))
+print(BF_BAR)
+print(BF_BAR_LB,BF_BAR_UB)
+'''
 plot_bar_chart(prob,fname,properties,compound,n_iter,n_models)
 
 create_percent_dev_triangle_plot(percent_deviation_trace_tuned,fname,'percent_dev_trace',new_lit_devs,prob,properties,compound,n_iter)
@@ -711,7 +765,7 @@ plt.plot(logp_trace,label='Log Posterior')
 plt.legend()
 plt.show()
 
-plt.plot(trace[:,0])
+#plt.plot(trace[:,0])
 
 np.save('trace/trace_'+fname+'.npy',trace_tuned)
 np.save('logprob/logprob_'+fname+'.npy',logp_trace)
@@ -735,7 +789,9 @@ trace_model_0=np.asarray(trace_model_0)
 trace_model_1=np.asarray(trace_model_1)
 trace_model_2=np.asarray(trace_model_2)
 
-
+plt.hist(alpha_vector[0],range=[-10,100],bins=50,alpha=0.7)
+plt.hist(alpha_vector[1],range=[-10,100],bins=50,alpha=0.7)
+plt.show()
 
 create_param_triangle_plot_4D(trace_model_0,fname,'trace_model_0',lit_params,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior)
 create_param_triangle_plot_4D(trace_model_1,fname,'trace_model_1',lit_params,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior)
@@ -744,4 +800,5 @@ create_param_triangle_plot_4D(trace_model_2,fname,'trace_model_2',lit_params,pro
 #Plot parameters
 
 get_metadata(compound,properties,sig_prior,eps_prior,L_prior,Q_prior,n_iter,swap_freq,n_points,transition_matrix,prob,attempt_matrix,acceptance_matrix)
+
 
