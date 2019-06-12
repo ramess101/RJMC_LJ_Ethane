@@ -28,8 +28,8 @@ from datetime import date
 # Here we have chosen ethane as the test case
 
 
-compound='O2'
-ff_params_ref,Tc_lit,M_w,thermo_data=parse_data_ffs(compound)
+compound='C2H2'
+ff_params_ref,Tc_lit,M_w,thermo_data,NIST_bondlength=parse_data_ffs(compound)
 #Retrieve force field literature values, constants, and thermo data
 
 T_min = 0.55*Tc_lit[0]
@@ -56,17 +56,17 @@ compound_2CLJ = LennardJones_2C(M_w)
 # Epsilon and sigma can be obtained from the critical constants
 #eps_Tc = Ethane_LJ.calc_eps_Tc(Tc_RP) #[K]
 #sig_rhoc = Ethane_LJ.calc_sig_rhoc(rhoc_RP) #[nm]
-'''
+
 
 
 # Create functions that return properties for a given model, eps, sig
 
 def rhol_hat_models(Temp,model,eps,sig,L,Q):
-    '''
+    
     L_nm=L/10
     sig_nm=sig/10
     Q_nm=Q/10
-    '''
+    
     if model == 0: #Two center AUA LJ
     
         rhol_hat = compound_2CLJ.rhol_hat_2CLJQ(Temp,eps,sig,L,0) 
@@ -78,11 +78,11 @@ def rhol_hat_models(Temp,model,eps,sig,L,Q):
     return rhol_hat #[kg/m3]       
   
 def Psat_hat_models(Temp,model,eps,sig,L,Q):
-    '''
+    
     L_nm=L/10
     sig_nm=sig/10
     Q_nm=Q/10
-    '''
+    
     if model == 0: #Two center AUA LJ
     
         Psat_hat = compound_2CLJ.Psat_hat_2CLJQ(Temp,eps,sig,L,0) 
@@ -94,11 +94,11 @@ def Psat_hat_models(Temp,model,eps,sig,L,Q):
     return Psat_hat #[kPa]       
 
 def SurfTens_hat_models(Temp,model,eps,sig,L,Q):
-    '''
+    
     L_nm=L/10
     sig_nm=sig/10
     Q_nm=Q/10
-    '''
+    
     if model == 0:
         
         SurfTens_hat=compound_2CLJ.ST_hat_2CLJQ(Temp,eps,sig,L,0)
@@ -110,11 +110,11 @@ def SurfTens_hat_models(Temp,model,eps,sig,L,Q):
     return SurfTens_hat
 
 def T_c_hat_models(model,eps,sig,L,Q):
-    '''
+    
     L_nm=L/10
     sig_nm=sig/10
     Q_nm=Q/10
-    '''
+    
     if model == 0: 
         
         T_c_hat=compound_2CLJ.T_c_hat_2CLJQ(eps,sig,L,0)
@@ -125,7 +125,7 @@ def T_c_hat_models(model,eps,sig,L,Q):
         
     return T_c_hat
 
-
+'''
 
 # Set percent uncertainty in each property
 # These values are to represent the simulation uncertainty more than the experimental uncertainty
@@ -181,7 +181,7 @@ runif = np.random.rand
 norm=distributions.norm.pdf
 unif=distributions.uniform.pdf
 
-properties = 'rhol+Psat'
+properties = 'rhol'
 number_criteria = 'two'
 sig_prior=[0.2,0.5]
 eps_prior=[0,200]
@@ -207,9 +207,9 @@ def calc_posterior(model,eps,sig,L,Q):
     
 #    print(eps,sig)
     #rhol_hat_fake = rhol_hat_models(T_lin,model,eps,sig)
-    rhol_hat = rhol_hat_models(thermo_data_rhoL[:,0],model,eps,sig,L,Q) #[kg/m3]
-    Psat_hat = Psat_hat_models(thermo_data_Pv[:,0],model,eps,sig,L,Q) #[kPa]   
-    SurfTens_hat = SurfTens_hat_models(thermo_data_SurfTens[:,0],model,eps,sig,L,Q)     
+    rhol_hat = rhol_hat_models(compound_2CLJ,thermo_data_rhoL[:,0],model,eps,sig,L,Q) #[kg/m3]
+    Psat_hat = Psat_hat_models(compound_2CLJ,thermo_data_Pv[:,0],model,eps,sig,L,Q) #[kPa]   
+    SurfTens_hat = SurfTens_hat_models(compound_2CLJ,thermo_data_SurfTens[:,0],model,eps,sig,L,Q)     
  
     # Data likelihood
     if properties == 'rhol':
@@ -298,7 +298,7 @@ AUA_opt_params,AUA_Q_opt_params = gen_Tmatrix()
 
 #The fraction of times a model swap is suggested as the move, rather than an intra-model move
 
-def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params):
+def RJMC_outerloop(compound_2CLJ, calc_posterior,n_iterations,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params):
     
     
     #INITIAL SETUP FOR MC LOOP
@@ -324,7 +324,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
     current_log_prob = calc_posterior(*trace[0])
     
     logp_trace[0] = current_log_prob
-    percent_deviation_trace[0]=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],initial_values,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
+    percent_deviation_trace[0]=computePercentDeviations(compound_2CLJ,thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],initial_values,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
     current_params=trace[0].copy()
     record_acceptance='False'
     #----------------------------------------------------------------------------------------#
@@ -349,7 +349,7 @@ def RJMC_outerloop(calc_posterior,n_iterations,initial_values,initial_sd,n_model
             accept_vector[i]=1
         logp_trace[i+1] = new_log_prob
         trace[i+1] = new_params
-        percent_deviation_trace[i+1]=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],trace[i+1],thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
+        percent_deviation_trace[i+1]=computePercentDeviations(compound_2CLJ,thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],trace[i+1],thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
         
         if (not (i+1) % tune_freq) and (i < tune_for):
         
@@ -442,7 +442,7 @@ def model_proposal(current_model,n_models,n_params,params,jacobian,transition_fu
     while proposed_model==current_model:
         proposed_model=int(np.floor(np.random.random()*n_models))
         
-    lamda=1
+    lamda=5
     params[0] = proposed_model
     if proposed_model==1:
         
@@ -575,7 +575,7 @@ def calc_posterior_refined(model,eps,sig,L,Q):
 
 initial_values=guess_0 # Can use critical constants
 initial_sd = np.asarray(initial_values)/100
-n_iter=1000000
+n_iter=10000000
 tune_freq=100
 tune_for=10000
 n_models=2
@@ -588,7 +588,7 @@ print('Properties: '+properties)
 print('MCMC Steps: '+str(n_iter))
 
 #The fraction of times a model swap is suggested as the move, rather than an intra-model move
-trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params)
+trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector = RJMC_outerloop(compound_2CLJ,calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,AUA_opt_params,AUA_Q_opt_params)
 
 
 #def MCMC_priors(RJMC_outerloop)
@@ -620,7 +620,7 @@ lit_params,lit_devs=import_literature_values(number_criteria,compound)
 #new_lit_devs=computePercentDeviations(thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],lit_devs,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
 
 #%%
-new_lit_devs=recompute_lit_percent_devs(lit_params,computePercentDeviations,thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],lit_devs,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models)
+new_lit_devs=recompute_lit_percent_devs(lit_params,computePercentDeviations,thermo_data_rhoL[:,0],thermo_data_Pv[:,0],thermo_data_SurfTens[:,0],lit_devs,thermo_data_rhoL[:,1],thermo_data_Pv[:,1],thermo_data_SurfTens[:,1],Tc_lit[0],rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models,compound_2CLJ)
 pareto_point,pareto_point_values=findParetoPoints(percent_deviation_trace_tuned,trace_tuned,0)
 
 
@@ -657,7 +657,7 @@ prob=[prob_0,prob_1]
 
 Exp_ratio=prob_0/prob_1
 
-plot_bar_chart(prob,fname,properties,compound,n_iter)
+#plot_bar_chart(prob,fname,properties,compound,n_iter,n_models)
 
 create_percent_dev_triangle_plot(percent_deviation_trace_tuned,fname,'percent_dev_trace',new_lit_devs,prob,properties,compound,n_iter)
 
@@ -668,6 +668,8 @@ print('Experimental sampling ratio: %2.3f' % Exp_ratio )
 print('Detailed Balance')
 print(prob_0*transition_matrix[0,1])
 print(prob_1*transition_matrix[1,0])
+
+
     
 trace_model_0=[]
 trace_model_1=[]

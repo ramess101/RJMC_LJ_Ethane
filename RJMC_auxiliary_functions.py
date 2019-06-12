@@ -328,8 +328,8 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         axs[2,2].axvline(x=L_prior[0],color='r',linestyle='--')
         axs[2,2].axvline(x=L_prior[1],color='r',linestyle='--')
         '''
-        axs[3,3].axvline(x=Q_prior[0],color='r',linestyle='--')
-        axs[3,3].axvline(x=Q_prior[1],color='r',linestyle='--')
+        #axs[3,3].axvline(x=Q_prior[0],color='r',linestyle='--')
+        #axs[3,3].axvline(x=Q_prior[1],color='r',linestyle='--')
         
         
 
@@ -491,8 +491,8 @@ def create_percent_dev_triangle_plot(trace,fname,tracename,lit_values,prob,prope
     handles,labels = axs[0,1].get_legend_handles_labels()
     fig.legend(handles,labels,loc=[0.05,0.3])
     
-    plt.savefig('triangle_plots/'+fname+tracename+'.png')
-    #plt.show()
+    #plt.savefig('triangle_plots/'+fname+tracename+'.png')
+    plt.show()
 
 
 def import_literature_values(criteria,compound):
@@ -551,11 +551,11 @@ def recompute_lit_percent_devs(lit_values,computePercentDeviations,temp_values_r
     return np.asarray(new_lit_devs)
     
 
-def get_metadata(compound,properties,sig_prior,eps_prior,L_prior,Q_prior,n_iter,swap_freq,n_points,transition_matrix,prob,attempt_matrix,acceptance_matrix):
+def get_metadata(directory,label,compound,properties,sig_prior,eps_prior,L_prior,Q_prior,n_iter,swap_freq,n_points,transition_matrix,prob,attempt_matrix,acceptance_matrix):
     metadata={'compound':compound,'Sigma Prior':sig_prior,'eps_prior':eps_prior,'L_prior':L_prior,'Q_Prior':Q_prior,'MCMC Steps': str(n_iter),'Swap Freq': str(swap_freq),'n_points':str(n_points),'timestamp':str(datetime.today()),
     'Transition Matrix':transition_matrix,'Model Probability':prob,'Attempt Matrix':attempt_matrix,'Acceptance Matrix':acceptance_matrix}
-    fname=compound+'_'+properties+'_'+str(n_points)+'_'+str(n_iter)+'_'+str(date.today())
-    f=open('metadata/'+fname+'.txt',"w")
+    fname=compound+'_'+properties+'_'+str(n_points)+'_'+str(n_iter)+'_'+str(date.today())+'_'+label
+    f=open(directory+'/metadata/'+fname+'.txt',"w")
     f.write( str(metadata) )
     f.close()
     return    

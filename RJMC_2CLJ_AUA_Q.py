@@ -26,18 +26,21 @@ from datetime import date
 import copy
 from pymbar import BAR,timeseries
 import random
+import sys
+#import multiprocessing as mp
+
 
 # Here we have chosen ethane as the test case
 
 
-compound='C2H6'
+compound=sys.argv[1]
 ff_params_ref,Tc_lit,M_w,thermo_data,NIST_bondlength=parse_data_ffs(compound)
 #Retrieve force field literature values, constants, and thermo data
 
 
-T_min = 0.55*Tc_lit[0]
-T_max = 0.95*Tc_lit[0]
-n_points=40
+T_min = float(sys.argv[2])*Tc_lit[0]
+T_max = float(sys.argv[3])*Tc_lit[0]
+n_points=int(sys.argv[4])
 
 #Select temperature range of data points to select, and how many temperatures within that range to use data at. 
 
@@ -137,22 +140,24 @@ properties = 'rhol+Psat'
 number_criteria = 'two'
 
 
-prior_range=0.05
+prior_range=float(sys.argv[5])
 
 #Uniform Priors (creating uniform priors based on optimization values)
-#eps_prior=[ff_params_ref[1][0]*(1-prior_range),ff_params_ref[1][0]*(1+prior_range)]
-#sig_prior=[ff_params_ref[1][1]*(1-prior_range),ff_params_ref[1][1]*(1+prior_range)]
-#L_prior=[ff_params_ref[1][2]*(1-prior_range),ff_params_ref[1][2]*(1+prior_range)]
+eps_prior=[ff_params_ref[1][0]*(1-prior_range),ff_params_ref[1][0]*(1+prior_range)]
+sig_prior=[ff_params_ref[1][1]*(1-prior_range),ff_params_ref[1][1]*(1+prior_range)]
+L_prior=[ff_params_ref[1][2]*(1-prior_range),ff_params_ref[1][2]*(1+prior_range)]
 
 
 
 #Logistic priors (creating logistic priors based to optimization values)
-shape_divide=10
+
+'''
+shape_divide=float(sys.argv[5])
 
 eps_prior=[ff_params_ref[1][0],ff_params_ref[1][0]/shape_divide]
 sig_prior=[ff_params_ref[1][1],ff_params_ref[1][1]/shape_divide]
 L_prior=[ff_params_ref[1][2],ff_params_ref[1][2]/shape_divide]
-
+'''
 #Q priors
 #Can use uniform or gamma prior
 #Uniform
@@ -163,8 +168,8 @@ Q_prior=[1,0,0.5]
 def calc_posterior(model,eps,sig,L,Q):
 
     logp = 0
-    logp += dlogit(sig, *sig_prior)
-    logp += dlogit(eps, *eps_prior)  
+    logp += duni(sig, *sig_prior)
+    logp += duni(eps, *eps_prior)  
     #Create priors for parameters common to all models     
     if model == 2:
         Q=0
@@ -172,12 +177,12 @@ def calc_posterior(model,eps,sig,L,Q):
     
     elif model == 0:
         Q=0
-        logp+=dlogit(L,*L_prior)
+        logp+=duni(L,*L_prior)
         #Add prior over L for AUA model
     
     elif model == 1:
         logp+=dgamma(Q,*Q_prior)
-        logp+=dlogit(L,*L_prior)
+        logp+=duni(L,*L_prior)
 
         #Add priors for Q and L for AUA+Q model
         
@@ -603,20 +608,35 @@ def mcmc_prior_proposal(n_models,calc_posterior,guess_params,guess_sd):
 n_models=3
 #Number of models considered
 
+initial_type=sys.argv[10]
+
+if initial_type =='AUA':
+    initial_values=guess_0
+elif initial_type == 'AUA+Q':
+    initial_values=guess_1
+elif initial_type == 'UA':
+    initial_values = guess_2
+else:
+    #initial_values=np.asarray([random.randint(0,n_models-1),logitrvs(*eps_prior),logitrvs(*sig_prior),logitrvs(*L_prior),gammarvs(*Q_prior)])
+    initial_values=np.asarray([random.randint(0,n_models-1),uniformrvs(*eps_prior),uniformrvs(*sig_prior),uniformrvs(*L_prior),gammarvs(*Q_prior)])
+    if initial_values[0]==0:
+        initial_values[4]=0
+    elif initial_values[0]==2:
+        initial_values[3]=NIST_bondlength
+        initial_values[4]=0
+print(initial_values)
+
 guess_test=[1,91.4,0.363,0.148,0]
 
 
 initial_values=np.empty(5)
 #randomly generate initial values from prior distributions
 
-initial_values=np.asarray([random.randint(0,n_models-1),logitrvs(*eps_prior),logitrvs(*sig_prior),logitrvs(*L_prior),gammarvs(*Q_prior)])
+#initial_values=np.asarray([random.randint(0,n_models-1),logitrvs(*eps_prior),logitrvs(*sig_prior),logitrvs(*L_prior),gammarvs(*Q_prior)])
+initial_values=np.asarray([random.randint(0,n_models-1),uniformrvs(*eps_prior),uniformrvs(*sig_prior),uniformrvs(*L_prior),gammarvs(*Q_prior)])
 
-if initial_values[0]==0:
-    initial_values[4]=0
-elif initial_values[0]==2:
-    initial_values[3]=NIST_bondlength
-    initial_values[4]=0
-print(initial_values)
+
+
     
 
 
@@ -624,7 +644,7 @@ print(initial_values)
 initial_sd = np.asarray(initial_values)/100
 
 
-n_iter=100000
+n_iter=int(sys.argv[7])
 #Number of iterations.  Should get decent results at 10^6, better at 10^7 (but takes like 3-5 hours)
 
 tune_freq=100
@@ -633,7 +653,7 @@ tune_for=10000
 
 
 
-swap_freq=0.1
+swap_freq=float(sys.argv[6])
 #Frequency of proposed model swaps. Best to keep below 0.2
 #Definitely a tradeoff between too low (slow convergence of sampling ratio) and too high (poor sampling in general).  Have found 0.05-0.1 to be good
 
@@ -645,7 +665,9 @@ print('MCMC Steps: '+str(n_iter))
 
 trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector,alpha_vector = RJMC_outerloop(calc_posterior,n_iter,initial_values,initial_sd,n_models,swap_freq,tune_freq,tune_for,jacobian,transition_function,opt_params_AUA,opt_params_AUA_Q,opt_params_2CLJ)
 #Initiate sampling!
-
+label=sys.argv[9]
+directory=sys.argv[8]
+print(directory)
 
 #%%
 # POST PROCESSING
@@ -668,11 +690,18 @@ transition_matrix[2,2]=1-transition_matrix[2,0]-transition_matrix[2,1]
 print('Transition Matrix:')
 print(transition_matrix)
 trace_tuned = trace[tune_for:]
+logp_trace_tuned = logp_trace[tune_for:]
 trace_tuned[:,2:]*=10
 percent_deviation_trace_tuned = percent_deviation_trace[tune_for:]
 model_params = trace_tuned[0,:]
 
+#[t0,g,Neff_max]=timeseries.detectEquilibration(logp_trace_tuned,nskip=100)
 
+#logp_trace_equil=logp_trace_tuned[t0:]
+trace_equil = trace_tuned
+#percent_deviation_trace_equil = percent_deviation_trace_tuned[t0:]
+
+print(len(trace_equil))
 
 fname=compound+'likelihood_data_amount_10'+'_'+properties+'_'+str(n_points)+'_'+str(n_iter)+'_'+str(date.today())
 
@@ -704,16 +733,16 @@ plotPercentDeviations(percent_deviation_trace_tuned,pareto_point,'MCMC Points','
 plotDeviationHistogram(percent_deviation_trace_tuned,pareto_point)
 '''
 # Converts the array with number of model parameters into an array with the number of times there was 1 parameter or 2 parameters
-model_count = np.array([len(trace_tuned[trace_tuned[:,0]==0]),len(trace_tuned[trace_tuned[:,0]==1]),len(trace_tuned[trace_tuned[:,0]==2])])
+model_count = np.array([len(trace_equil[trace_equil[:,0]==0]),len(trace_equil[trace_equil[:,0]==1]),len(trace_equil[trace_equil[:,0]==2])])
 
 
-prob_0 = 1.*model_count[0]/(n_iter-tune_for+1)
+prob_0 = 1.*model_count[0]/(len(trace_equil))
 print('Percent that  model 0 is sampled: '+str(prob_0 * 100.)) #The percent that use 1 parameter model
 
-prob_1 = 1.*model_count[1]/(n_iter-tune_for+1)
+prob_1 = 1.*model_count[1]/(len(trace_equil))
 print('Percent that model 1 is sampled: '+str(prob_1 * 100.)) #The percent that use two center UA LJ
 
-prob_2 = 1.*model_count[2]/(n_iter-tune_for+1)
+prob_2 = 1.*model_count[2]/(len(trace_equil))
 print('Percent that model 2 is sampled: '+str(prob_2 * 100.)) #The percent that use two center UA LJ
 
 prob=[prob_0,prob_1,prob_2]
@@ -729,9 +758,9 @@ BF_BAR_UB=np.exp(-(BAR_estimate[0]-BAR_estimate[1]))
 print(BF_BAR)
 print(BF_BAR_LB,BF_BAR_UB)
 '''
-plot_bar_chart(prob,fname,properties,compound,n_iter,n_models)
+#plot_bar_chart(prob,fname,properties,compound,n_iter,n_models)
 
-create_percent_dev_triangle_plot(percent_deviation_trace_tuned,fname,'percent_dev_trace',new_lit_devs,prob,properties,compound,n_iter)
+#create_percent_dev_triangle_plot(percent_deviation_trace_tuned,fname,'percent_dev_trace',new_lit_devs,prob,properties,compound,n_iter)
 
 #print('Analytical sampling ratio: %2.3f' % ratio)
 print('Experimental sampling ratio: %2.3f' % Exp_ratio )
@@ -765,11 +794,13 @@ plt.plot(logp_trace,label='Log Posterior')
 plt.legend()
 plt.show()
 
-#plt.plot(trace[:,0])
 
-np.save('trace/trace_'+fname+'.npy',trace_tuned)
-np.save('logprob/logprob_'+fname+'.npy',logp_trace)
-np.save('percent_dev/percent_dev_'+fname+'.npy',percent_deviation_trace_tuned)
+plt.plot(trace[:,0])
+plt.show()
+
+#np.save('trace/trace_'+fname+'.npy',trace_tuned)
+#np.save('logprob/logprob_'+fname+'.npy',logp_trace)
+#np.save('percent_dev/percent_dev_'+fname+'.npy',percent_deviation_trace_tuned)
 #Save trajectories (can be disabled since they are big files)
 
 
@@ -789,16 +820,16 @@ trace_model_0=np.asarray(trace_model_0)
 trace_model_1=np.asarray(trace_model_1)
 trace_model_2=np.asarray(trace_model_2)
 
-plt.hist(alpha_vector[0],range=[-10,100],bins=50,alpha=0.7)
-plt.hist(alpha_vector[1],range=[-10,100],bins=50,alpha=0.7)
-plt.show()
-
-create_param_triangle_plot_4D(trace_model_0,fname,'trace_model_0',lit_params,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior)
-create_param_triangle_plot_4D(trace_model_1,fname,'trace_model_1',lit_params,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior)
-create_param_triangle_plot_4D(trace_model_2,fname,'trace_model_2',lit_params,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior)
+#plt.hist(alpha_vector[0],range=[-10,100],bins=50,alpha=0.7)
+#plt.hist(alpha_vector[1],range=[-10,100],bins=50,alpha=0.7)
+#plt.show()
+sys.exit(np.mean(logp_trace_tuned))
+#create_param_triangle_plot_4D(trace_model_0,fname,'trace_model_0',lit_params,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior)
+#create_param_triangle_plot_4D(trace_model_1,fname,'trace_model_1',lit_params,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior)
+#create_param_triangle_plot_4D(trace_model_2,fname,'trace_model_2',lit_params,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior)
 
 #Plot parameters
 
-get_metadata(compound,properties,sig_prior,eps_prior,L_prior,Q_prior,n_iter,swap_freq,n_points,transition_matrix,prob,attempt_matrix,acceptance_matrix)
+get_metadata(directory,label,compound,properties,sig_prior,eps_prior,L_prior,Q_prior,n_iter,swap_freq,n_points,transition_matrix,prob,attempt_matrix,acceptance_matrix)
 
-
+#write outputs to file
