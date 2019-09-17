@@ -28,6 +28,7 @@ import random
 import sys
 import os
 from shutil import rmtree
+import math
 
 
 
@@ -183,44 +184,49 @@ class RJMC_Simulation():
         return logp
                 
     def set_initial_state(self,prior,compound_2CLJ,initial_model=None,initial_position=None):
-        initial_values=np.empty(5)
-        self.n_models=3
-        
-        rnorm=np.random.normal
-        
-        initial_values[0]=random.randint(0,self.n_models-1)
-         
-        
-        if initial_model == 'AUA':
-            initial_values[0] = 0
-        elif initial_model == 'AUA+Q':
-            initial_values[0] = 1
-        elif initial_model == 'UA':
-            initial_values[0] = 2
-        
-        if initial_values[0] == 0:
-            initial_values[1] = rnorm(self.opt_params_AUA[0],self.opt_params_AUA[0]/5)
-            initial_values[2] = rnorm(self.opt_params_AUA[1],self.opt_params_AUA[1]/5)
-            initial_values[3] = rnorm(self.opt_params_AUA[2],self.opt_params_AUA[2]/5)
-            initial_values[4] = 0
-        elif initial_values[0] == 1:
-            initial_values[1] = rnorm(self.opt_params_AUA_Q[0],self.opt_params_AUA_Q[0]/5)
-            initial_values[2] = rnorm(self.opt_params_AUA_Q[1],self.opt_params_AUA_Q[1]/5)
-            initial_values[3] = rnorm(self.opt_params_AUA_Q[2],self.opt_params_AUA_Q[2]/5)
-            initial_values[4] = rnorm(self.opt_params_AUA_Q[2],self.opt_params_AUA_Q[2]/5)
-        elif initial_values[0] == 2:
-            initial_values[1] = rnorm(self.opt_params_UA[0],self.opt_params_UA[0]/5)
-            initial_values[2] = rnorm(self.opt_params_UA[1],self.opt_params_UA[1]/5)
-            initial_values[3] = self.NIST_bondlength
-            initial_values[4] = 0
+        initial_logp=math.nan
+        while math.isnan(initial_logp):       
+            initial_values=np.empty(5)
+            self.n_models=3
             
-        if initial_position != None:
-            initial_values=initial_position
-        print('Markov Chain initialized at values:', initial_values)
-        print('==============================')
-        self.n_params=len(initial_values)
-        self.prop_sd=np.asarray(initial_values)/100
-        initial_logp = self.calc_posterior(prior,compound_2CLJ,initial_values)
+            rnorm=np.random.normal
+            
+            initial_values[0]=random.randint(0,self.n_models-1)
+             
+            
+            if initial_model == 'AUA':
+                initial_values[0] = 0
+            elif initial_model == 'AUA+Q':
+                initial_values[0] = 1
+            elif initial_model == 'UA':
+                initial_values[0] = 2
+            
+            if initial_values[0] == 0:
+                initial_values[1] = rnorm(self.opt_params_AUA[0],self.opt_params_AUA[0]/10)
+                initial_values[2] = rnorm(self.opt_params_AUA[1],self.opt_params_AUA[1]/10)
+                initial_values[3] = rnorm(self.opt_params_AUA[2],self.opt_params_AUA[2]/10)
+                initial_values[4] = 0
+            elif initial_values[0] == 1:
+                initial_values[1] = rnorm(self.opt_params_AUA_Q[0],self.opt_params_AUA_Q[0]/10)
+                initial_values[2] = rnorm(self.opt_params_AUA_Q[1],self.opt_params_AUA_Q[1]/10)
+                initial_values[3] = rnorm(self.opt_params_AUA_Q[2],self.opt_params_AUA_Q[2]/10)
+                initial_values[4] = rnorm(self.opt_params_AUA_Q[2],self.opt_params_AUA_Q[2]/10)
+            elif initial_values[0] == 2:
+                initial_values[1] = rnorm(self.opt_params_UA[0],self.opt_params_UA[0]/10)
+                initial_values[2] = rnorm(self.opt_params_UA[1],self.opt_params_UA[1]/10)
+                initial_values[3] = self.NIST_bondlength
+                initial_values[4] = 0
+                
+            if initial_position != None:
+                initial_values=initial_position
+            print('Markov Chain initialized at values:', initial_values)
+            print('==============================')
+            self.n_params=len(initial_values)
+            self.prop_sd=np.asarray(initial_values)/100
+            initial_logp = self.calc_posterior(prior,compound_2CLJ,initial_values)
+            if math.isnan(initial_logp):
+                print('Nan detected! Finding new values')
+            
         print('Initial log posterior:', initial_logp)
         print('==============================')
         self.initial_values=initial_values
@@ -339,12 +345,12 @@ class RJMC_Simulation():
         self.trace = [self.initial_values]
         self.logp_trace = [self.initial_logp]
         self.percent_dev_trace = [self.initial_percent_deviation]
-        self.alpha_trace=[]
+        self.BAR_trace=[]
         self.move_proposals=np.zeros((self.n_models,self.n_models))
         self.move_acceptances=np.zeros((self.n_models,self.n_models))
         
-        print('Initializing Simulation')
-        print('Tuning Proposals')
+        print('Initializing Simulation...')
+        print('Tuning Proposals...')
         print('==============================')
         for i in range(self.steps+1):
             if not i%50000: print('Iteration '+str(i)),print('Log Posterior:',self.logp_trace[i])
@@ -398,9 +404,17 @@ class RJMC_Simulation():
         
         random_move=np.random.random()
         
+        
         if random_move <= self.swap_freq:
             proposed_params,proposed_log_prob,proposed_model,rjmc_jacobian,rjmc_transition=self.model_proposal(prior,proposed_params,compound_2CLJ)
             alpha = (proposed_log_prob - self.current_log_prob) + np.log(rjmc_jacobian) + np.log(rjmc_transition)
+            self.BAR_trace.append([proposed_model,(proposed_log_prob - self.current_log_prob) + np.log(rjmc_jacobian)])
+            
+            
+            if proposed_log_prob == math.nan:
+                proposed_log_prob=-math.inf
+                print('nan detected')
+                
             
         else:
             proposed_params, proposed_log_prob=self.parameter_proposal(prior,proposed_params,compound_2CLJ)
@@ -643,6 +657,32 @@ class RJMC_Simulation():
         self.trace_model_1=np.asarray(trace_model_1)
         self.trace_model_2=np.asarray(trace_model_2)
         
+        self.BAR_trace=np.asarray(self.BAR_trace)
+        
+        BAR_vector_0 = []
+        BAR_vector_1 = []
+        BAR_vector_2 = []
+        
+        for i in range(len(self.BAR_trace)):
+            if self.BAR_trace[i,0] == 0:
+                BAR_vector_0.append(self.BAR_trace[i,1])
+            elif self.BAR_trace[i,0] == 1:
+                BAR_vector_1.append(self.BAR_trace[i,1])
+            elif self.BAR_trace[i,0] == 2:
+                BAR_vector_2.append(self.BAR_trace[i,1])   
+        
+        BAR_vector_0=np.asarray(BAR_vector_0)
+        BAR_vector_1=np.asarray(BAR_vector_1)
+        BAR_vector_2=np.asarray(BAR_vector_2)
+        
+        BAR_estimate=BAR(BAR_vector_0,BAR_vector_1)
+        
+        BF_BAR=np.exp(-BAR_estimate[0])
+        BF_BAR_LB=np.exp(-(BAR_estimate[0]+BAR_estimate[1]))
+        BF_BAR_UB=np.exp(-(BAR_estimate[0]-BAR_estimate[1]))
+        print(BF_BAR)
+        print(BF_BAR_LB,BF_BAR_UB)
+        
         if plotting == True:
             
             
@@ -651,10 +691,17 @@ class RJMC_Simulation():
             create_param_triangle_plot_4D(self.trace_model_1,'trace_model_1',self.lit_params,self.properties,self.compound,self.steps)
             create_param_triangle_plot_4D(self.trace_model_2,'trace_model_2',self.lit_params,self.properties,self.compound,self.steps)
 
-            create_percent_dev_triangle_plot(percent_dev_trace_equil,fname,'percent_dev_trace',lit_devs,prob,self.properties,self.compound,self.steps)
+            create_percent_dev_triangle_plot(percent_dev_trace_equil,'percent_dev_trace',self.lit_devs,self.prob,self.properties,self.compound,self.steps)
     
         
-        return self.trace,self.logp_trace,self.percent_dev_trace
+        return self.trace,self.logp_trace,self.percent_dev_trace,self.BAR_trace
+    
+    def refit_prior(self,prior_values):
+        if prior_values['Q'][0] == 'exponential':
+            new_prior=fit_exponential(self.trace_model_1[:,4])
+            
+            Q_prior=[new_prior[1]]
+        return Q_prior
     
     def write_output(self,prior_dict,tag=None,save_traj=False):
         
@@ -683,7 +730,7 @@ class RJMC_Simulation():
         plt.savefig(path+'/figures/logp_trace.png')
         plt.close()
         
-        plt.plot(self.trace_tuned[0])
+        plt.plot(self.trace_tuned[:,0])
         plt.savefig(path+'/figures/model_trace.png')
         plt.close()
         
@@ -742,7 +789,8 @@ class RJMC_Simulation():
                  'Final Move SD': self.prop_sd,
                  'Accepted Moves': self.move_acceptances,
                  'Transition Matrix': self.transition_matrix,
-                 'Model Probabilities':self.prob}
+                 'Model Probabilities':self.prob,
+                 'Timestamp': str(datetime.today())}
         
         f=open(path+'/results.txt',"w")
         f.write( str(results) )
@@ -876,12 +924,19 @@ def main():
                         type=str,
                         help='label for files',
                         required=False)        
+    parser.add_argument('--save_traj','-j',
+                        type=bool,
+                        help='Whether to save trajectory files',
+                        required=False)        
+   
    
     T_range=[0.55,0.95]
     n_points=10
     swap_freq=0.1
     biasing_factor=[0,0,0]
     optimum_matching=['True','True']
+    tag=''
+    save_traj=False
     
     
     prior_values ={
@@ -912,14 +967,18 @@ def main():
         prior_values=args.priors
     if args.label is not None:
         tag=args.label
+    if args.save_traj is not None:
+        save_traj=args.save_traj
     
     
     prior = RJMC_Prior(prior_values)
-    
     prior.epsilon_prior()
     prior.sigma_prior()
     prior.L_prior()
-    prior.Q_prior()
+    prior.Q_prior()     
+
+    
+    
     
     rjmc_simulator = RJMC_Simulation(compound,T_range,properties,n_points,steps,swap_freq,biasing_factor,optimum_matching)
 
@@ -930,12 +989,12 @@ def main():
     compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w) 
 
     rjmc_simulator.gen_Tmatrix(prior,compound_2CLJ)    
-    print(rjmc_simulator.opt_params_AUA)
+    #print(rjmc_simulator.opt_params_AUA)
     rjmc_simulator.set_initial_state(prior,compound_2CLJ)
 
     rjmc_simulator.RJMC_Outerloop(prior,compound_2CLJ)
     trace,logp_trace,percent_dev_trace=rjmc_simulator.Report()
-    rjmc_simulator.write_output(prior_values,tag=tag,save_traj=True)
+    rjmc_simulator.write_output(prior_values,tag=tag,save_traj=save_traj)
     print('Finished!')
 
   

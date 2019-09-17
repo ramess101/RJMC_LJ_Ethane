@@ -16,7 +16,7 @@ from LennardJones_correlations import LennardJones
 from LennardJones_2Center_correlations import LennardJones_2C
 from scipy.stats import distributions
 from scipy.stats import linregress
-from scipy.optimize import minimize
+from scipy.optimize import minimize,curve_fit
 import random as rm
 from pymc3.stats import hpd
 import matplotlib.patches as mpatches
@@ -157,7 +157,7 @@ def findSingleMinPoints(percent_deviation_trace,trace):
 def parse_data_ffs(compound):
     fname = "lit_forcefields/"+compound+".yaml"
     with open(fname) as yfile:
-        yfile = yaml.load(yfile)
+        yfile = yaml.load(yfile)#,Loader=yaml.FullLoader)
     ff_params=[]
     params=['eps_lit','sig_lit','Lbond_lit','Q_lit']
     for name in params:
@@ -177,7 +177,7 @@ def parse_data_ffs(compound):
     data=['rhoL','Pv','SurfTens']
     data_dict={}
     for name in data:
-        df=pd.read_table('TRC_data/'+compound+'/'+name+'.txt')
+        df=pd.read_csv('TRC_data/'+compound+'/'+name+'.txt',sep='\t')
         df=df.dropna()
         data_dict[name]=df
     return ff_params_ref, Tc_lit, M_w,data_dict, NIST_bondlength[0][1]/10
@@ -295,17 +295,18 @@ def calculate_uncertainties(thermo_data,T_c):
     return u_dict
         
 
-def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,compound,n_iter,sig_prior,eps_prior,L_prior,Q_prior):
+def create_param_triangle_plot_4D(trace,tracename,lit_values,properties,compound,n_iter,file_loc=None):#,sig_prior,eps_prior,L_prior,Q_prior):
     if np.shape(trace) != (0,):
     
         fig,axs=plt.subplots(4,4,figsize=(8,8))
-        fig.suptitle('Parameter Marginal Distributions, '+compound+', '+properties+', '+str(n_iter)+' steps',fontsize=16)
+        fig.suptitle('Parameter Marginal Distributions, '+compound+', '+properties+', '+str(n_iter)+' steps',fontsize=20)
+        
         axs[0,0].hist(trace[:,1],bins=50,color='m',density=True,label='RJMC Sampling')
         axs[1,1].hist(trace[:,2],bins=50,color='m',density=True)
         axs[2,2].hist(trace[:,3],bins=50,color='m',density=True)
         axs[3,3].hist(trace[:,4],bins=50,color='m',density=True)
         
-        
+        '''
         sig_prior=np.multiply(sig_prior,10)
         L_prior=np.multiply(L_prior,10)
         Q_prior=np.multiply(Q_prior,10)
@@ -315,7 +316,7 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         L_range=np.linspace(0.5*min(trace[:,3]),2*max(trace[:,3]),num=100)
         
         logitpdf=distributions.logistic.pdf
-        
+        '''
         #axs[0,0].plot(sig_range,1000000000*logitpdf(sig_range,*sig_prior))
         #axs[1,1].plot(eps_range,1000000*logitpdf(eps_range,*eps_prior))
         #axs[2,2].plot(L_range,10*logitpdf(L_range,*L_prior))
@@ -342,7 +343,7 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         axs[2,3].hist2d(trace[:,4],trace[:,3],bins=100,cmap='cool')
         
         
-        axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none',label='Stobener Pareto Values')
+        axs[0,1].scatter(lit_values[::4,1],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none',label='Pareto Values')
         axs[0,2].scatter(lit_values[::4,2],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none')
         axs[0,3].scatter(lit_values[::4,3],lit_values[::4,0],color='0.25',marker='o',alpha=0.5,facecolors='none')
         axs[1,2].scatter(lit_values[::4,2],lit_values[::4,1],color='0.25',marker='o',alpha=0.5,facecolors='none')
@@ -387,15 +388,15 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         axs[3,3].set_yticklabels([]) 
         
     
-        axs[0,0].set(ylabel=r'$\epsilon$ (K)')
-        axs[1,1].set(ylabel=r'$\sigma$ ($\AA$)')
-        axs[2,2].set(ylabel=r'L ($\AA$)')
-        axs[3,3].set(ylabel=r'Q (D$\AA$)')
+        axs[0,0].set_ylabel(r'$\epsilon$ (K)',fontsize=14)
+        axs[1,1].set_ylabel(r'$\sigma$ ($\AA$)',fontsize=14)
+        axs[2,2].set_ylabel(r'L ($\AA$)',fontsize=14)
+        axs[3,3].set_ylabel(r'Q (D$\AA$)',fontsize=14)
     
-        axs[0,0].set(xlabel=r'$\epsilon$ (K)') 
-        axs[0,1].set(xlabel=r'$\sigma$ ($\AA$)')
-        axs[0,2].set(xlabel=r'L ($\AA$)')
-        axs[0,3].set(xlabel=r'Q (D$\AA$)')
+        axs[0,0].set_xlabel(r'$\epsilon$ (K)',fontsize=14) 
+        axs[0,1].set_xlabel(r'$\sigma$ ($\AA$)',fontsize=14)
+        axs[0,2].set_xlabel(r'L ($\AA$)',fontsize=14)
+        axs[0,3].set_xlabel(r'Q (D$\AA$)',fontsize=14)
     
         axs[0,0].xaxis.set_label_position('top')
         axs[0,1].xaxis.set_label_position('top')
@@ -406,13 +407,14 @@ def create_param_triangle_plot_4D(trace,fname,tracename,lit_values,properties,co
         handles0,labels0 = axs[0,0].get_legend_handles_labels()
         #plt.figlegend((label0,label1),('Literature','RJMC Sampling'))
         fig.legend(handles,labels,loc=[0.1,0.4])
-        plt.savefig('triangle_plots/'+fname+tracename+'.png')
+        plt.savefig(file_loc+tracename+'.png')
+        plt.close()
         #plt.show()
     return
         
         
         
-def create_percent_dev_triangle_plot(trace,fname,tracename,lit_values,prob,properties,compound,n_iter):
+def create_percent_dev_triangle_plot(trace,tracename,lit_values,properties,compound,n_iter,file_loc=None):
     fig,axs=plt.subplots(4,4,figsize=(8,8))
     fig.suptitle('Percent Deviation Marginal Distributions, '+compound+', '+properties+', '+str(n_iter)+' steps')
     axs[0,0].hist(trace[:,0],bins=50,color='m',density=True)
@@ -491,8 +493,9 @@ def create_percent_dev_triangle_plot(trace,fname,tracename,lit_values,prob,prope
     handles,labels = axs[0,1].get_legend_handles_labels()
     fig.legend(handles,labels,loc=[0.05,0.3])
     
-    #plt.savefig('triangle_plots/'+fname+tracename+'.png')
-    plt.show()
+    plt.savefig(file_loc+tracename+'.png')
+    plt.close()
+    #plt.show()
 
 
 def import_literature_values(criteria,compound):
@@ -506,7 +509,7 @@ def import_literature_values(criteria,compound):
     return np.asarray(df1),np.asarray(df2)
     #return df1,df2
     
-def plot_bar_chart(prob,filename,properties,compound,n_iter,n_models):
+def plot_bar_chart(prob,properties,compound,n_iter,n_models,file_loc=None):
     x=np.arange(n_models)
     prob=prob[-1:]+prob[:-1]
     print(prob)
@@ -530,7 +533,8 @@ def plot_bar_chart(prob,filename,properties,compound,n_iter,n_models):
     plt.title('Model Bayes Factor, '+compound+', '+properties+', '+str(n_iter)+' steps',fontsize=14)
     plt.ylabel('Bayes Factor',fontsize=14)
     
-    plt.savefig('bar_charts/bayes_factor'+filename+'.png')
+    plt.savefig(file_loc+'/bar_chart.png')
+    plt.close()
     #plt.show()
     return
 
@@ -696,5 +700,31 @@ def calc_posterior_refined(model,eps,sig,L,Q):
     return logp
     #return rhol_hat
 
+def fit_exponential(trace,bins=25):
+    y,x=np.histogram(trace,bins=bins,density=True)
+    x_adjust=[]
+    for i in range(len(x)-1):
+        x_adjust.append((x[i]+x[i+1])/2)
+    def func(x,a,b):
+        return a*np.exp(-np.multiply(1/b,x))
+    
+    popt,pcov= curve_fit(func,x_adjust,y,bounds=(0,[500,400]))
+    #plt.plot(x_adjust,func(x_adjust,*popt))
+    #plt.plot(x_adjust,y)
+    #plt.show()
+    return popt
 
+def fit_gamma(trace,bins=25):
+    y,x=np.histogram(trace,bins=bins,density=True)
+    x_adjust=[]
+    for i in range(len(x)-1):
+        x_adjust.append((x[i]+x[i+1])/2)
+    def func(x,a,b):
+        return (1/(sp.special.gamma(a)*(b**a)))*np.power(x,a-1)*np.exp(-x/b)
+    
+    popt,pcov= curve_fit(func,x_adjust,y,bounds=(0,[500,400]))
+    plt.plot(x_adjust,func(x_adjust,*popt))
+    plt.plot(x_adjust,y)
+    plt.show()
+    return popt
 

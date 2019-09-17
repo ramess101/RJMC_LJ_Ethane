@@ -31,11 +31,11 @@ from RJMC_2CLJQ_OOP import RJMC_Simulation,RJMC_Prior
 
 def main():
     compound='C2H6'
-    properties='rhol+Psat'
+    properties='All'
     T_range=[0.55,0.95]
     n_points=10
     swap_freq=0.1
-    steps=2*10**4
+    steps=1*10**6
     biasing_factor=[0,0,0]
     optimum_matching=['True','True']
     
@@ -64,11 +64,11 @@ def main():
     compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w) 
 
     rjmc_simulator.gen_Tmatrix(prior,compound_2CLJ)    
-    print(rjmc_simulator.opt_params_AUA)
+    #print(rjmc_simulator.opt_params_AUA)
     rjmc_simulator.set_initial_state(prior,compound_2CLJ)
 
     rjmc_simulator.RJMC_Outerloop(prior,compound_2CLJ)
-    trace,logp_trace,percent_dev_trace=rjmc_simulator.Report()
+    trace,logp_trace,percent_dev_trace,BAR_trace=rjmc_simulator.Report()
     rjmc_simulator.write_output(prior_values,tag='test_2',save_traj=True)
     print('Finished!')
     return trace, logp_trace,percent_dev_trace
