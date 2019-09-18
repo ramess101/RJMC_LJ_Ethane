@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Sep 11 09:25:17 2019
+Created on Tue Sep 17 12:15:44 2019
 
 @author: owenmadin
 """
@@ -26,12 +26,93 @@ import copy
 from pymbar import BAR, timeseries
 import random
 import sys
-import os
-from shutil import rmtree
-from RJMC_2CLJQ_OOP import RJMC_Prior, RJMC_Simulation
+from RJMC_2CLJQ_OOP import RJMC_Simulation, RJMC_Prior
 
 
-def main():
+def do_AUA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior):
+    
+    AUA_simulation = RJMC_Simulation(compound,
+                                     T_range,
+                                     properties,
+                                     n_points,
+                                     1 * 10**6,
+                                     0.0,
+                                     biasing_factor,
+                                     optimum_matching)
+    AUA_simulation.prepare_data()
+    compound_2CLJ = LennardJones_2C(AUA_simulation.M_w)
+    AUA_simulation.gen_Tmatrix(prior, compound_2CLJ)
+    AUA_simulation.set_initial_state(prior,
+                                     compound_2CLJ,
+                                     initial_model='AUA')
+    AUA_simulation.RJMC_Outerloop(prior, compound_2CLJ)
+    AUA_simulation.Report()
+    AUA_logp_trace=AUA_simulation.logp_trace
+
+    return AUA_logp_trace    
+    
+def do_AUA_Q_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior):
+
+    AUA_Q_simulation = RJMC_Simulation(compound,
+                                     T_range,
+                                     properties,
+                                     n_points,
+                                     1 * 10**6,
+                                     0.0,
+                                     biasing_factor,
+                                     optimum_matching)
+    AUA_Q_simulation.prepare_data()
+    compound_2CLJ = LennardJones_2C(AUA_Q_simulation.M_w)
+    AUA_Q_simulation.gen_Tmatrix(prior, compound_2CLJ)
+    AUA_Q_simulation.set_initial_state(prior,
+                                     compound_2CLJ,
+                                     initial_model='AUA+Q')
+    AUA_Q_simulation.RJMC_Outerloop(prior, compound_2CLJ)
+    AUA_Q_simulation.Report()
+    AUA_Q_logp_trace=AUA_Q_simulation.logp_trace
+    
+    return AUA_Q_logp_trace
+    
+def do_UA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior):
+    
+    UA_simulation = RJMC_Simulation(compound,
+                                     T_range,
+                                     properties,
+                                     n_points,
+                                     1 * 10**6,
+                                     0.0,
+                                     biasing_factor,
+                                     optimum_matching)
+    UA_simulation.prepare_data()
+    compound_2CLJ = LennardJones_2C(UA_simulation.M_w)
+    UA_simulation.gen_Tmatrix(prior, compound_2CLJ)
+    UA_simulation.set_initial_state(prior,
+                                     compound_2CLJ,
+                                     initial_model='UA')
+    UA_simulation.RJMC_Outerloop(prior, compound_2CLJ)
+    UA_simulation.Report()
+    UA_logp_trace=UA_simulation.logp_trace
+    
+    return UA_logp_trace
+
+
+def compute_biasing_factors(UA_logp_trace, AUA_logp_trace, AUA_Q_logp_trace):
+    
+    UA_logp=np.mean(UA_logp_trace[10000:])
+    
+    AUA_logp=np.mean(AUA_logp_trace[10000:])
+    
+    AUA_Q_logp=np.mean(AUA_Q_logp_trace[10000:])
+    
+    UA_biasing_factor=AUA_logp-UA_logp
+    
+    AUA_Q_biasing_factor=AUA_logp-AUA_Q_logp
+    
+    
+    return UA_biasing_factor,AUA_Q_biasing_factor
+    
+
+def parse_args():
 
     parser = argparse.ArgumentParser(description='Process input parameters for RJMC 2CLJQ')
 
@@ -87,6 +168,12 @@ def main():
                         type=bool,
                         help='Whether to save trajectory files',
                         required=False)
+    
+    args = parser.parse_args()
+
+    return args
+
+def main():
 
     T_range = [0.55, 0.95]
     n_points = 10
@@ -102,11 +189,12 @@ def main():
         'L': ['exponential', [3]],
         'Q': ['exponential', [1]]}
 
-    args = parser.parse_args()
+
+    args=parse_args()
+
     print(args.compound)
 
     compound = args.compound
-    # T_range=args.trange
     steps = args.steps
     properties = args.properties
 
@@ -132,6 +220,18 @@ def main():
     prior.sigma_prior()
     prior.L_prior()
     prior.Q_prior()
+    
+    UA_logp_trace=do_UA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
+    
+    AUA_Q_logp_trace=do_AUA_Q_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
+    
+    AUA_logp_trace=do_AUA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
+    
+    UA_biasing_factor,AUA_Q_biasing_factor=compute_biasing_factors(UA_logp_trace, AUA_logp_trace, AUA_Q_logp_trace)
+    
+    biasing_factor=[0, AUA_Q_biasing_factor, UA_biasing_factor]
+    
+    
 
     mcmc_prior_simulation = RJMC_Simulation(compound,
                                             T_range,
@@ -179,10 +279,6 @@ def main():
     rjmc_simulator.set_initial_state(prior, compound_2CLJ)
 
     rjmc_simulator.RJMC_Outerloop(prior, compound_2CLJ)
-    trace, logp_trace, percent_dev_trace,BAR_trace = rjmc_simulator.Report(USE_BAR=True)
+    trace, logp_trace, percent_dev_trace = rjmc_simulator.Report()
     rjmc_simulator.write_output(prior_values, tag=tag, save_traj=save_traj)
     print('Finished!')
-
-
-if __name__ == '__main__':
-    main()

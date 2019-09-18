@@ -22,6 +22,7 @@ from pymc3.stats import hpd
 import matplotlib.patches as mpatches
 from datetime import datetime,date
 import copy
+import math
 
 
 def computePercentDeviations(compound_2CLJ,temp_values_rhol,temp_values_psat,temp_values_surftens,parameter_values,rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models):
@@ -728,3 +729,60 @@ def fit_gamma(trace,bins=25):
     plt.show()
     return popt
 
+def plot_BAR_values(BAR_trace):
+    BAR_vector_0_1 = []
+    BAR_vector_1_0 = []
+    BAR_vector_2_0 = []
+    BAR_vector_0_2 = []
+
+    for i in range(len(BAR_trace)):
+        if BAR_trace[i, 0] == 0 and BAR_trace[i, 1] == 1:
+            if str(BAR_trace[i, 2]) != 'nan':
+                BAR_vector_0_1.append(BAR_trace[i, 2])
+        elif BAR_trace[i, 0] == 1 and BAR_trace[i,1] == 0:
+            if str(BAR_trace[i, 2]) != 'nan':
+                BAR_vector_1_0.append(BAR_trace[i, 2])
+        elif BAR_trace[i, 0] == 0 and BAR_trace[i,1] == 2:
+            if str(BAR_trace[i, 2]) != 'nan':
+                BAR_vector_0_2.append(BAR_trace[i, 2])
+        elif BAR_trace[i, 0] == 2 and BAR_trace[i,1] == 0:
+            if str(BAR_trace[i, 2]) != 'nan':
+                BAR_vector_2_0.append(BAR_trace[i, 2])
+
+    print(len(BAR_vector_0_1))
+    print(len(BAR_vector_1_0))
+    print(len(BAR_vector_0_2))
+    print(len(BAR_vector_2_0))
+   
+    if len(BAR_vector_0_1) != 0 and len(BAR_vector_1_0) != 0:
+    
+        plt.hist(BAR_vector_0_1,label = '1 --> 0',alpha=0.5,bins=50,density=True)
+        plt.xlabel('"Free Energy" Difference')
+        plt.ylabel('Frequency')
+        plt.title('BAR Histograms, Attempts from 1-->0')
+        plt.legend()
+        plt.show()
+        plt.hist(BAR_vector_1_0,label = '0 --> 1',range=(-10,10000),alpha=0.5,bins=50,density=True)
+        plt.xlabel('"Free Energy" Difference')
+        plt.ylabel('Frequency')
+        plt.title('BAR Histograms,Attempts from 0 --> 1')
+        plt.legend()
+        plt.show()
+            
+        
+    if len(BAR_vector_0_2) != 0 and len(BAR_vector_2_0) != 0:
+        plt.hist(BAR_vector_0_2,label = '2 --> 0', alpha=0.5,bins=50)
+        plt.xlabel('"Free Energy" Difference')
+        plt.ylabel('Frequency')
+        plt.title('BAR Histograms,Attempts from 0 --> 2')
+        plt.legend()
+        plt.show()
+        plt.hist(BAR_vector_2_0,label = '0 --> 2', alpha=0.5,bins=50)
+        plt.xlabel('"Free Energy" Difference')
+        plt.ylabel('Frequency')
+        plt.title('BAR Histograms,Attempts from 2 --> 0')
+        plt.legend()
+        plt.show()
+        
+    return BAR_vector_0_1,BAR_vector_1_0
+        

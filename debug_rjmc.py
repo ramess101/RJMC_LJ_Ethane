@@ -23,60 +23,60 @@ from pymc3.stats import hpd
 from RJMC_auxiliary_functions import *
 from datetime import date
 import copy
-from pymbar import BAR,timeseries
+from pymbar import BAR, timeseries
 import random
 import sys
-from RJMC_2CLJQ_OOP import RJMC_Simulation,RJMC_Prior
+from RJMC_2CLJQ_OOP import RJMC_Simulation, RJMC_Prior
 
 
 def main():
-    compound='C2H6'
-    properties='All'
-    T_range=[0.55,0.95]
-    n_points=10
-    swap_freq=0.1
-    steps=1*10**6
-    biasing_factor=[0,0,0]
-    optimum_matching=['True','True']
-    
-    
-    
-    prior_values ={
-        'epsilon': ['exponential',[400]],
-        'sigma': ['exponential',[5]],
-        'L': ['exponential',[3]],
-        'Q': ['exponential',[1]]}
-    
-    
-    
+    compound = 'O2'
+    properties = 'rhol+Psat'
+    T_range = [0.55, 0.95]
+    n_points = 10
+    swap_freq = 0.1
+    steps = 1 * 10**5
+    biasing_factor = [0, 0, 0]
+    optimum_matching = ['False', 'True']
+
+    prior_values = {
+        'epsilon': ['exponential', [400]],
+        'sigma': ['exponential', [5]],
+        'L': ['exponential', [3]],
+        'Q': ['exponential', [1]]}
+
     prior = RJMC_Prior(prior_values)
-    
+
     prior.epsilon_prior()
     prior.sigma_prior()
     prior.L_prior()
     prior.Q_prior()
-    
-    rjmc_simulator = RJMC_Simulation(compound,T_range,properties,n_points,steps,swap_freq,biasing_factor,optimum_matching)
+
+    rjmc_simulator = RJMC_Simulation(
+        compound,
+        T_range,
+        properties,
+        n_points,
+        steps,
+        swap_freq,
+        biasing_factor,
+        optimum_matching)
 
     rjmc_simulator.prepare_data()
     print(rjmc_simulator.get_attributes())
 
-    compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w) 
+    compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w)
 
-    rjmc_simulator.gen_Tmatrix(prior,compound_2CLJ)    
-    #print(rjmc_simulator.opt_params_AUA)
-    rjmc_simulator.set_initial_state(prior,compound_2CLJ)
+    rjmc_simulator.gen_Tmatrix(prior, compound_2CLJ)
+    # print(rjmc_simulator.opt_params_AUA)
+    rjmc_simulator.set_initial_state(prior, compound_2CLJ)
 
-    rjmc_simulator.RJMC_Outerloop(prior,compound_2CLJ)
-    trace,logp_trace,percent_dev_trace,BAR_trace=rjmc_simulator.Report()
-    rjmc_simulator.write_output(prior_values,tag='test_2',save_traj=True)
+    rjmc_simulator.RJMC_Outerloop(prior, compound_2CLJ)
+    trace, logp_trace, percent_dev_trace, BAR_trace = rjmc_simulator.Report(USE_BAR=True)
+    rjmc_simulator.write_output(prior_values, tag='BAR_testing', save_traj=True)
     print('Finished!')
-    return trace, logp_trace,percent_dev_trace
+    return trace, logp_trace, percent_dev_trace,BAR_trace
 
 
-
-  
-
-    
 if __name__ == '__main__':
-    trace, logp_trace,percent_dev_trace=main()
+    trace, logp_trace, percent_dev_trace, BAR_trace = main()
