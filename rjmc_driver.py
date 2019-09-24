@@ -28,15 +28,15 @@ import random
 import sys
 from RJMC_2CLJ_AUA_Q import *
 
-compound='N2'
+compound='C2H6'
 properties=['rhol+Psat','two']
 temp_range=[0.55,0.95]
 n_points=10
 prior_type=['exponential','exponential']
 eps_sig_L_prior_params=[40,40,40]
-Q_prior=[0,0.25]
-n_iter=4*10**6
-prior_max_values=[200,5,3,0.5]
+Q_prior=[0,1]
+n_iter=5*10**6
+prior_max_values=[400,5,3,1]
 
 trace,logp_trace,percent_deviation_trace, attempt_matrix,acceptance_matrix,prop_sd,accept_vector,alpha_vector=run_RJMC(compound,properties,temp_range,n_points,eps_sig_L_prior_params,Q_prior,prior_type,n_iter,biasing_factor_AUA=0,biasing_factor_UA=0,swap_freq=0.1,initial_model='AUA+Q',prior_max_values=prior_max_values,optimum_matching='True')
 
@@ -169,7 +169,7 @@ log_trace_2=[]
 
 #Initiate data frames for separating model traces
 
-plt.plot(logp_trace[1000000:],label='Log Posterior')
+plt.plot(logp_trace,label='Log Posterior')
 plt.legend()
 plt.show()
 
@@ -177,7 +177,7 @@ plt.show()
 plt.plot(trace[:,0])
 plt.show()
 
-np.save('trace_'+fname+'.npy',trace_tuned)
+#np.save('trace_'+fname+'.npy',trace_tuned)
 #np.save('logprob/logprob_'+fname+'.npy',logp_trace)
 #np.save('percent_dev/percent_dev_'+fname+'.npy',percent_deviation_trace_tuned)
 #Save trajectories (can be disabled since they are big files)
@@ -203,9 +203,9 @@ trace_model_2=np.asarray(trace_model_2)
 #plt.hist(alpha_vector[1],range=[-10,100],bins=50,alpha=0.7)
 #plt.show()
 #sys.exit(np.mean(logp_trace_tuned))
-create_param_triangle_plot_4D(trace_model_0,fname,'trace_model_0',lit_params,properties,compound,n_iter)
-create_param_triangle_plot_4D(trace_model_1,fname,'trace_model_1',lit_params,properties,compound,n_iter)
-create_param_triangle_plot_4D(trace_model_2,fname,'trace_model_2',lit_params,properties,compound,n_iter)
+#create_param_triangle_plot_4D(trace_model_0,fname,'trace_model_0',lit_params,properties,compound,n_iter)
+#create_param_triangle_plot_4D(trace_model_1,fname,'trace_model_1',lit_params,properties,compound,n_iter)
+#create_param_triangle_plot_4D(trace_model_2,fname,'trace_model_2',lit_params,properties,compound,n_iter)
 
 #Plot parameters
 

@@ -676,16 +676,20 @@ class RJMC_Simulation():
         BAR_vector_1_0 = []
         BAR_vector_2_0 = []
         BAR_vector_0_2 = []
-
+    
         for i in range(len(self.BAR_trace)):
             if self.BAR_trace[i, 0] == 0 and self.BAR_trace[i, 1] == 1:
-                BAR_vector_0_1.append(self.BAR_trace[i, 2])
+                if str(self.BAR_trace[i, 2]) != 'nan':
+                    BAR_vector_0_1.append(self.BAR_trace[i, 2])
             elif self.BAR_trace[i, 0] == 1 and self.BAR_trace[i,1] == 0:
-                BAR_vector_1_0.append(self.BAR_trace[i, 2])
+                if str(self.BAR_trace[i, 2]) != 'nan':
+                    BAR_vector_1_0.append(self.BAR_trace[i, 2])
             elif self.BAR_trace[i, 0] == 0 and self.BAR_trace[i,1] == 2:
-                BAR_vector_0_2.append(self.BAR_trace[i, 2])
+                if str(self.BAR_trace[i, 2]) != 'nan':
+                    BAR_vector_0_2.append(self.BAR_trace[i, 2])
             elif self.BAR_trace[i, 0] == 2 and self.BAR_trace[i,1] == 0:
-                BAR_vector_2_0.append(self.BAR_trace[i, 2])
+                if str(self.BAR_trace[i, 2]) != 'nan':
+                    BAR_vector_2_0.append(self.BAR_trace[i, 2])
 
            
         
@@ -858,6 +862,7 @@ class RJMC_Simulation():
         np.save(path + '/trace/trace.npy', self.trace_tuned)
         np.save(path + '/trace/logp_trace.npy', self.logp_trace_tuned)
         np.save(path + '/trace/percent_dev_trace_tuned.npy', self.percent_dev_trace_tuned)
+        np.save(path + '/trace/BAR_trace.npy',self.BAR_trace)
 
 
 class RJMC_Prior():

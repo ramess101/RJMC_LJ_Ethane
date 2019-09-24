@@ -230,7 +230,7 @@ def main():
     UA_biasing_factor,AUA_Q_biasing_factor=compute_biasing_factors(UA_logp_trace, AUA_logp_trace, AUA_Q_logp_trace)
     
     biasing_factor=[0, AUA_Q_biasing_factor, UA_biasing_factor]
-    
+    print('Biasing factor', biasing_factor)
     
 
     mcmc_prior_simulation = RJMC_Simulation(compound,

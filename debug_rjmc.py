@@ -31,11 +31,11 @@ from RJMC_2CLJQ_OOP import RJMC_Simulation, RJMC_Prior
 
 def main():
     compound = 'O2'
-    properties = 'rhol+Psat'
+    properties = 'All'
     T_range = [0.55, 0.95]
     n_points = 10
     swap_freq = 0.1
-    steps = 1 * 10**5
+    steps = 1 * 10**6
     biasing_factor = [0, 0, 0]
     optimum_matching = ['False', 'True']
 
