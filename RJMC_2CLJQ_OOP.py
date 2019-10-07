@@ -23,13 +23,14 @@ from pymc3.stats import hpd
 from RJMC_auxiliary_functions import *
 from datetime import date
 import copy
+import pymbar
 from pymbar import BAR, timeseries
 import random
 import sys
 import os
 from shutil import rmtree
 import math
-
+from tqdm import tqdm
 
 class RJMC_Simulation():
     """ Builds an object that runs an RJMC simulation based on the parameters the user gives to it
@@ -349,9 +350,10 @@ class RJMC_Simulation():
         print('Initializing Simulation...')
         print('Tuning Proposals...')
         print('==============================')
-        for i in range(self.steps + 1):
+        for i in tqdm(range(self.steps)):
             if not i % 50000:
-                print('Iteration ' + str(i)), print('Log Posterior:', self.logp_trace[i])
+                #print('Iteration ' + str(i)), print('Log Posterior:', self.logp_trace[i])
+                pass
             self.current_params = self.trace[i].copy()
             self.current_model = int(self.current_params[0])
             self.current_log_prob = self.logp_trace[i].copy()
@@ -387,8 +389,8 @@ class RJMC_Simulation():
                 self.move_proposals = np.zeros((self.n_models, self.n_models))
                 self.move_acceptances = np.zeros((self.n_models, self.n_models))
                 self.BAR_trace = []
-                print('Tuning complete!')
-                print('==============================')
+                #print('Tuning complete!')
+                #print('==============================')
         self.trace = np.asarray(self.trace)
         self.logp_trace = np.asarray(self.logp_trace)
         self.percent_dev_trace = np.asarray(self.percent_dev_trace)
@@ -405,7 +407,7 @@ class RJMC_Simulation():
                 prior, proposed_params, compound_2CLJ)
             alpha = (proposed_log_prob - self.current_log_prob) + np.log(rjmc_jacobian) + np.log(rjmc_transition)
             BAR_value = [proposed_model, self.current_params[0], -((proposed_log_prob - self.current_log_prob) + np.log(rjmc_jacobian))]
-            self.BAR_trace.append(BAR_value)
+            self.BAR_trace.append([BAR_value,proposed_params])
 
             if proposed_log_prob == math.nan:
                 proposed_log_prob = -math.inf
@@ -578,9 +580,9 @@ class RJMC_Simulation():
         print('==============================')
         self.transition_matrix = transition_matrix
 
-        self.trace_tuned = self.trace[self.tune_for:]
-        self.logp_trace_tuned = self.logp_trace[self.tune_for:]
-        self.percent_dev_trace_tuned = self.percent_dev_trace[self.tune_for:]
+        self.trace_tuned = self.trace[self.tune_for + 1:]
+        self.logp_trace_tuned = self.logp_trace[self.tune_for + 1:]
+        self.percent_dev_trace_tuned = self.percent_dev_trace[self.tune_for + 1:]
 
         self.lit_params, self.lit_devs = import_literature_values('two', self.compound)
         trace_equil = self.trace_tuned
@@ -651,6 +653,8 @@ class RJMC_Simulation():
             self.BF_BAR = self.compute_BAR()
             print('BAR Bayes factor estimates')
             print(self.BF_BAR)
+            
+            
         else:
             self.BF_BAR = None
             
@@ -667,10 +671,11 @@ class RJMC_Simulation():
             create_percent_dev_triangle_plot(percent_dev_trace_equil, 'percent_dev_trace',
                                              self.lit_devs, self.prob, self.properties, self.compound, self.steps)
 
-        return self.trace, self.logp_trace, self.percent_dev_trace, self.BAR_trace
+        return self.trace_tuned, self.logp_trace_tuned, self.percent_dev_trace_tuned, self.BAR_trace
 
 
     def compute_BAR(self):
+        
         
         BAR_vector_0_1 = []
         BAR_vector_1_0 = []
@@ -678,44 +683,65 @@ class RJMC_Simulation():
         BAR_vector_0_2 = []
     
         for i in range(len(self.BAR_trace)):
-            if self.BAR_trace[i, 0] == 0 and self.BAR_trace[i, 1] == 1:
-                if str(self.BAR_trace[i, 2]) != 'nan':
-                    BAR_vector_0_1.append(self.BAR_trace[i, 2])
-            elif self.BAR_trace[i, 0] == 1 and self.BAR_trace[i,1] == 0:
-                if str(self.BAR_trace[i, 2]) != 'nan':
-                    BAR_vector_1_0.append(self.BAR_trace[i, 2])
-            elif self.BAR_trace[i, 0] == 0 and self.BAR_trace[i,1] == 2:
-                if str(self.BAR_trace[i, 2]) != 'nan':
-                    BAR_vector_0_2.append(self.BAR_trace[i, 2])
-            elif self.BAR_trace[i, 0] == 2 and self.BAR_trace[i,1] == 0:
-                if str(self.BAR_trace[i, 2]) != 'nan':
-                    BAR_vector_2_0.append(self.BAR_trace[i, 2])
-
-           
-        
-        BAR_vector_0_1 = np.asarray(BAR_vector_0_1)
-        BAR_vector_1_0 = np.asarray(BAR_vector_1_0)
-        
-        BAR_vector_0_2 = np.asarray(BAR_vector_0_2)
-        BAR_vector_2_0 = np.asarray(BAR_vector_2_0)
-
+            if self.BAR_trace[i, 0][0] == 0 and self.BAR_trace[i, 0][1] == 1:
+                if str(self.BAR_trace[i, 0][2]) != 'nan':
+                    BAR_vector_0_1.append([self.BAR_trace[i, 0][2],self.BAR_trace[i,1]])
+            elif self.BAR_trace[i, 0][0] == 1 and self.BAR_trace[i, 0][1] == 0:
+                if str(self.BAR_trace[i, 0][2]) != 'nan':
+                    BAR_vector_1_0.append([self.BAR_trace[i, 0][2],self.BAR_trace[i,1]])
+            elif self.BAR_trace[i, 0][0] == 0 and self.BAR_trace[i, 0][1] == 2:
+                if str(self.BAR_trace[i, 0][2]) != 'nan':
+                    BAR_vector_0_2.append([self.BAR_trace[i, 0][2],self.BAR_trace[i,1]])
+            elif self.BAR_trace[i, 0][0] == 2 and self.BAR_trace[i, 0][1] == 0:
+                if str(self.BAR_trace[i, 0][2]) != 'nan':
+                    BAR_vector_2_0.append([self.BAR_trace[i, 0][2],self.BAR_trace[i,1]])
         if len(BAR_vector_0_1) != 0 and len(BAR_vector_1_0) != 0:
+            BAR_vector_0_1=self.BAR_subsample(BAR_vector_0_1)
+            BAR_vector_1_0=self.BAR_subsample(BAR_vector_1_0)
             BAR_estimate_0_1 = BAR(BAR_vector_1_0, BAR_vector_0_1)
             BF_BAR_0_1 = [np.exp(BAR_estimate_0_1[0]),
                      [np.exp((BAR_estimate_0_1[0] - BAR_estimate_0_1[1])), np.exp((BAR_estimate_0_1[0] + BAR_estimate_0_1[1]))]]
         else:
             BF_BAR_0_1 = 'No BAR Estimate'
-
+        
         if len(BAR_vector_0_2) != 0 and len(BAR_vector_2_0) != 0:
-            BAR_estimate_0_2 = BAR(BAR_vector_2_0, BAR_vector_0_2)
+            BAR_vector_0_2=self.BAR_subsample(BAR_vector_0_2)
+            BAR_vector_2_0=self.BAR_subsample(BAR_vector_2_0)
+            BAR_estimate_0_2 = BAR(BAR_vector_2_0,BAR_vector_0_2)
             BF_BAR_0_2 = [np.exp(BAR_estimate_0_2[0]),
                      [np.exp((BAR_estimate_0_2[0] - BAR_estimate_0_2[1])), np.exp((BAR_estimate_0_2[0] + BAR_estimate_0_2[1]))]]
+            #print(type(BAR_vector_0_1[:,0]))
+            #print(BAR_vector_0_1[:,1])
+        
+            
+
+
+       
+           
         else: 
             BF_BAR_0_2 = 'No BAR Estimate'
             
         BF_BAR = [BF_BAR_0_1,BF_BAR_0_2]
         
         return BF_BAR
+    
+    def BAR_subsample(self,BAR_vector):
+
+        BAR_probabilities = np.asarray([i[0] for i in BAR_vector])
+        BAR_params = np.asarray([i[1] for i in BAR_vector])
+        BAR_indices = [] 
+        for i in range(1,len(BAR_params[0])):
+            try:
+                indices=timeseries.subsampleCorrelatedData(BAR_params[:,i])
+                BAR_indices.append([indices,len(indices)])
+            except pymbar.utils.ParameterError:
+                continue
+        BAR_indices=np.asarray(BAR_indices)
+        chosen_samples=BAR_indices[:,0][np.argmin(BAR_indices[:,1])]
+        
+        BAR_probabilities_USE=BAR_probabilities[chosen_samples]
+        
+        return  BAR_probabilities_USE
         
     def refit_prior(self, prior_values):
         if prior_values['Q'][0] == 'exponential':

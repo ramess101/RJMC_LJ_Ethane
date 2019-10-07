@@ -81,7 +81,7 @@ def do_UA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum
                                      T_range,
                                      properties,
                                      n_points,
-                                     1 * 10**6,
+                                     2 * 10**4,
                                      0.0,
                                      biasing_factor,
                                      optimum_matching)
@@ -232,7 +232,7 @@ def main():
     
     UA_biasing_factor,AUA_Q_biasing_factor=compute_biasing_factors(UA_logp_trace, AUA_logp_trace, AUA_Q_logp_trace)
     
-    biasing_factor=np.asarray([0, AUA_Q_biasing_factor, UA_biasing_factor])
+    biasing_factor=np.asarray([0, AUA_Q_biasing_factor, 0])
     print('Biasing factor', biasing_factor)
     
 

@@ -785,4 +785,20 @@ def plot_BAR_values(BAR_trace):
         plt.show()
         
     return BAR_vector_0_1,BAR_vector_1_0
+
+
+
+def unbias_simulation(biasing_factor,probabilities):
+    unbias_prob = probabilities*np.exp(-biasing_factor)
+    unbias_prob_normalized = unbias_prob/sum(unbias_prob)
         
+    return unbias_prob_normalized
+
+def undo_bar(BAR_Output):
+    for value in BAR_Output:
+        if value == 'No Bar Estimate':
+            value[0] = 0
+            value.append([0,0])
+    unnorm_prob = np.asarray([1,1/BAR_Output[0],1/BAR_Output[1]])
+    norm_prob = unnorm_prob/sum(unnorm_prob)
+    return norm_prob
