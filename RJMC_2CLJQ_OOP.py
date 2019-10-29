@@ -977,7 +977,7 @@ class RJMC_Prior():
             self.epsilon_prior_values = [eps_prior_vals[0],eps_prior_vals[1]]
         elif eps_prior_type == 'gamma':
             self.epsilon_prior_function = self.dgamma
-            self.epsilon_prior_values = [eps_prior_vals[0], 0, eps_prior_vals[1]]
+            self.epsilon_prior_values = [eps_prior_vals[0], eps_prior_vals[1],eps_prior_vals[2]]
 
     def sigma_prior(self):
         sig_prior_type, sig_prior_vals = self.prior_dict['sigma']
@@ -987,7 +987,7 @@ class RJMC_Prior():
             self.sigma_prior_values = [sig_prior_vals[0],sig_prior_vals[1]]
         elif sig_prior_type == 'gamma':
             self.sigma_prior_function = self.dgamma
-            self.sigma_prior_values = [sig_prior_vals[0], 0, sig_prior_vals[1]]
+            self.sigma_prior_values = [sig_prior_vals[0], sig_prior_vals[1],sig_prior_vals[2]]
 
     def L_prior(self):
         L_prior_type, L_prior_vals = self.prior_dict['L']
@@ -997,7 +997,7 @@ class RJMC_Prior():
             self.L_prior_values = [L_prior_vals[0],L_prior_vals[1]]
         elif L_prior_type == 'gamma':
             self.L_prior_function = self.dgamma
-            self.L_prior_values = [L_prior_vals[0], 0, L_prior_vals[1]]
+            self.L_prior_values = [L_prior_vals[0], L_prior_vals[1], L_prior_vals[2]]
 
     def Q_prior(self):
         Q_prior_type, Q_prior_vals = self.prior_dict['Q']
@@ -1007,7 +1007,7 @@ class RJMC_Prior():
             self.Q_prior_values = [Q_prior_vals[0], Q_prior_vals[1]]
         elif Q_prior_type == 'gamma':
             self.Q_prior_function = self.dgamma
-            self.Q_prior_values = [Q_prior_vals[0], 0, Q_prior_vals[1]]
+            self.Q_prior_values = [Q_prior_vals[0], Q_prior_vals[1], Q_prior_vals[2]]
 
 
 def main():
