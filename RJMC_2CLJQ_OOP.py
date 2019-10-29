@@ -776,11 +776,14 @@ class RJMC_Simulation():
         
         return  BAR_probabilities_USE
         
-    def refit_prior(self, prior_values):
-        if prior_values['Q'][0] == 'exponential':
-            new_prior = fit_exponential(self.trace_model_1[:, 4])
+    def refit_prior(self, prior_type='exponential'):
+        if prior_type == 'exponential':
+            new_prior = fit_exponential_sp(self.trace_model_1)
 
-            Q_prior = [new_prior[1]]
+            Q_prior = [prior_type,new_prior]
+        elif prior_type == 'gamma':
+            new_prior = fit_gamma_sp(self.trace_model_1)
+            Q_prior = [prior_type,new_prior]
         return Q_prior
 
     def write_output(self, prior_dict, tag=None, save_traj=False):
@@ -971,7 +974,7 @@ class RJMC_Prior():
 
         if eps_prior_type == 'exponential':
             self.epsilon_prior_function = self.dexp
-            self.epsilon_prior_values = [0, eps_prior_vals[0]]
+            self.epsilon_prior_values = [eps_prior_vals[0],eps_prior_vals[1]]
         elif eps_prior_type == 'gamma':
             self.epsilon_prior_function = self.dgamma
             self.epsilon_prior_values = [eps_prior_vals[0], 0, eps_prior_vals[1]]
@@ -981,7 +984,7 @@ class RJMC_Prior():
 
         if sig_prior_type == 'exponential':
             self.sigma_prior_function = self.dexp
-            self.sigma_prior_values = [0, sig_prior_vals[0]]
+            self.sigma_prior_values = [sig_prior_vals[0],sig_prior_vals[1]]
         elif sig_prior_type == 'gamma':
             self.sigma_prior_function = self.dgamma
             self.sigma_prior_values = [sig_prior_vals[0], 0, sig_prior_vals[1]]
@@ -991,7 +994,7 @@ class RJMC_Prior():
 
         if L_prior_type == 'exponential':
             self.L_prior_function = self.dexp
-            self.L_prior_values = [0, L_prior_vals[0]]
+            self.L_prior_values = [L_prior_vals[0],L_prior_vals[1]]
         elif L_prior_type == 'gamma':
             self.L_prior_function = self.dgamma
             self.L_prior_values = [L_prior_vals[0], 0, L_prior_vals[1]]
@@ -1001,7 +1004,7 @@ class RJMC_Prior():
 
         if Q_prior_type == 'exponential':
             self.Q_prior_function = self.dexp
-            self.Q_prior_values = [0, Q_prior_vals[0]]
+            self.Q_prior_values = [Q_prior_vals[0], Q_prior_vals[1]]
         elif Q_prior_type == 'gamma':
             self.Q_prior_function = self.dgamma
             self.Q_prior_values = [Q_prior_vals[0], 0, Q_prior_vals[1]]
@@ -1073,10 +1076,10 @@ def main():
     save_traj = False
 
     prior_values = {
-        'epsilon': ['exponential', [400]],
-        'sigma': ['exponential', [5]],
-        'L': ['exponential', [3]],
-        'Q': ['exponential', [1]]}
+        'epsilon': ['exponential', [0,400]],
+        'sigma': ['exponential', [0,5]],
+        'L': ['exponential', [0,3]],
+        'Q': ['exponential', [0,1]]}
 
     args = parser.parse_args()
     print(args.compound)

@@ -41,10 +41,10 @@ def main():
     optimum_matching = ['True', 'True']
 
     prior_values = {
-        'epsilon': ['exponential', [400]],
-        'sigma': ['exponential', [5]],
-        'L': ['exponential', [3]],
-        'Q': ['exponential', [1]]}
+        'epsilon': ['exponential', [0,400]],
+        'sigma': ['exponential', [0,5]],
+        'L': ['exponential', [0,3]],
+        'Q': ['exponential', [0,1]]}
 
     prior = RJMC_Prior(prior_values)
 
@@ -80,9 +80,9 @@ def main():
     #rjmc_simulator.write_output(prior_values, tag='multinom_test', save_traj=True)
     print('Finished!')
     #return trace, logp_trace, percent_dev_trace,BAR_trace
-    return AUA_params,AUAQ_params,ff_params
+    return AUA_params,AUAQ_params,ff_params,prior_values
 
 
 if __name__ == '__main__':
-    AUA_params,AUAQ_params, ff_params =  main()
+    AUA_params,AUAQ_params, ff_params,prior_values =  main()
     #trace, logp_trace, percent_dev_trace, BAR_trace = main()
