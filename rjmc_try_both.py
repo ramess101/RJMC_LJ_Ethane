@@ -110,7 +110,7 @@ def main():
 
 
     compound = args.compound
-    # T_range=args.trange
+    #T_range=args.trange
     steps = args.steps
     properties = args.properties
 
@@ -138,39 +138,24 @@ def main():
     prior.L_prior()
     prior.Q_prior()
 
-    mcmc_prior_simulation = RJMC_Simulation(compound,
-                                            T_range,
-                                            properties,
-                                            n_points,
-                                            1 * 10**6,
-                                            0.0,
-                                            biasing_factor,
-                                            optimum_matching)
-    mcmc_prior_simulation.prepare_data()
-    compound_2CLJ = LennardJones_2C(mcmc_prior_simulation.M_w)
-    mcmc_prior_simulation.gen_Tmatrix(prior, compound_2CLJ)
-    mcmc_prior_simulation.set_initial_state(prior,
+    rjmc_simulation = RJMC_Simulation(compound, T_range, properties, n_points, steps,
+                                     0.0, biasing_factor, optimum_matching)
+    rjmc_simulation.prepare_data()
+    compound_2CLJ = LennardJones_2C(rjmc_simulation.M_w)
+    rjmc_simulation.gen_Tmatrix(prior, compound_2CLJ)
+    rjmc_simulation.set_initial_state(prior,
                                             compound_2CLJ,
                                             initial_model='AUA+Q')
-    mcmc_prior_simulation.RJMC_Outerloop(prior, compound_2CLJ)
-    mcmc_prior_simulation.Report()
-    prior_values['Q'][1] = mcmc_prior_simulation.refit_prior(prior_values)
-    print(prior_values['Q'][1])
-
-    print('Refitting Prior for Q')
-
-    prior = RJMC_Prior(prior_values)
-    prior.epsilon_prior()
-    prior.sigma_prior()
-    prior.L_prior()
-    prior.Q_prior()
+    rjmc_simulation.RJMC_Outerloop(prior, compound_2CLJ)
+    rjmc_simulation.Report()
+    rjmc_simulation.write_output(prior_values, tag='auaq_only', save_traj=save_traj)
 
     rjmc_simulator = RJMC_Simulation(compound,
                                      T_range,
                                      properties,
                                      n_points,
                                      steps,
-                                     swap_freq,
+                                     0.0,
                                      biasing_factor,
                                      optimum_matching)
 
@@ -182,11 +167,11 @@ def main():
 
     rjmc_simulator.gen_Tmatrix(prior, compound_2CLJ)
     print(rjmc_simulator.opt_params_AUA)
-    rjmc_simulator.set_initial_state(prior, compound_2CLJ)
+    rjmc_simulator.set_initial_state(prior, compound_2CLJ,initial_model = 'AUA')
 
     rjmc_simulator.RJMC_Outerloop(prior, compound_2CLJ)
-    trace, logp_trace, percent_dev_trace,BAR_trace = rjmc_simulator.Report(USE_BAR=True)
-    rjmc_simulator.write_output(prior_values, tag=tag, save_traj=save_traj)
+    rjmc_simulator.Report()
+    rjmc_simulator.write_output(prior_values, tag='aua_only', save_traj=save_traj)
     print('Finished!')
 
 

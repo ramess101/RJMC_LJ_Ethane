@@ -29,15 +29,16 @@ import sys
 from RJMC_2CLJQ_OOP import RJMC_Simulation, RJMC_Prior
 
 
+
 def main():
-    compound = 'O2'
-    properties = 'All'
+    compound = 'C2F4'
+    properties = 'rhol+Psat'
     T_range = [0.55, 0.95]
     n_points = 10
     swap_freq = 0.1
     steps = 1 * 10**6
     biasing_factor = [0, 0, 0]
-    optimum_matching = ['False', 'True']
+    optimum_matching = ['True', 'True']
 
     prior_values = {
         'epsilon': ['exponential', [400]],
@@ -68,15 +69,20 @@ def main():
     compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w)
 
     rjmc_simulator.gen_Tmatrix(prior, compound_2CLJ)
+    AUA_params = rjmc_simulator.opt_params_AUA
+    AUAQ_params = rjmc_simulator.opt_params_AUA_Q
+    ff_params = rjmc_simulator.ff_params_ref
     # print(rjmc_simulator.opt_params_AUA)
     rjmc_simulator.set_initial_state(prior, compound_2CLJ)
-
-    rjmc_simulator.RJMC_Outerloop(prior, compound_2CLJ)
-    trace, logp_trace, percent_dev_trace, BAR_trace = rjmc_simulator.Report(USE_BAR=True)
-    rjmc_simulator.write_output(prior_values, tag='BAR_testing', save_traj=True)
+    rjmc_simulator.try_rjmc_move = True
+    #rjmc_simulator.RJMC_Outerloop(prior, compound_2CLJ)
+    #trace, logp_trace, percent_dev_trace, BAR_trace = rjmc_simulator.Report(USE_BAR=True)
+    #rjmc_simulator.write_output(prior_values, tag='multinom_test', save_traj=True)
     print('Finished!')
-    return trace, logp_trace, percent_dev_trace,BAR_trace
+    #return trace, logp_trace, percent_dev_trace,BAR_trace
+    return AUA_params,AUAQ_params,ff_params
 
 
 if __name__ == '__main__':
-    trace, logp_trace, percent_dev_trace, BAR_trace = main()
+    AUA_params,AUAQ_params, ff_params =  main()
+    #trace, logp_trace, percent_dev_trace, BAR_trace = main()

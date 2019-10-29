@@ -16,13 +16,14 @@ from LennardJones_correlations import LennardJones
 from LennardJones_2Center_correlations import LennardJones_2C
 from scipy.stats import distributions
 from scipy.stats import linregress
+from scipy.stats import gamma,expon
 from scipy.optimize import minimize,curve_fit
 import random as rm
-from pymc3.stats import hpd
-import matplotlib.patches as mpatches
 from datetime import datetime,date
 import copy
 import math
+import pymbar
+from statsmodels.stats.proportion import multinomial_proportions_confint
 
 
 def computePercentDeviations(compound_2CLJ,temp_values_rhol,temp_values_psat,temp_values_surftens,parameter_values,rhol_data,psat_data,surftens_data,T_c_data,rhol_hat_models,Psat_hat_models,SurfTens_hat_models,T_c_hat_models):
@@ -701,19 +702,15 @@ def calc_posterior_refined(model,eps,sig,L,Q):
     return logp
     #return rhol_hat
 
-def fit_exponential(trace,bins=25):
-    y,x=np.histogram(trace,bins=bins,density=True)
-    x_adjust=[]
-    for i in range(len(x)-1):
-        x_adjust.append((x[i]+x[i+1])/2)
-    def func(x,a,b):
-        return a*np.exp(-np.multiply(1/b,x))
-    
-    popt,pcov= curve_fit(func,x_adjust,y,bounds=(0,[500,400]))
-    #plt.plot(x_adjust,func(x_adjust,*popt))
-    #plt.plot(x_adjust,y)
-    #plt.show()
-    return popt
+def fit_exponential_sp(trace,plot=False):
+    loc,scale = expon.fit(trace[:,4])
+    if plot == True:
+        xmax = max(trace[:,4])
+        xmin = min(trace[:,4])
+        xdata = np.linspace(xmin,xmax,num=500)
+        plt.plot(xdata,gamma.pdf(xdata,loc,scale))
+        plt.hist(trace[:,4],bins=50,density=True)
+    return loc,scale
 
 def fit_gamma(trace,bins=25):
     y,x=np.histogram(trace,bins=bins,density=True)
@@ -729,6 +726,17 @@ def fit_gamma(trace,bins=25):
     plt.show()
     return popt
 
+def fit_gamma_sp(trace,plot=False):
+    alpha,loc,beta = gamma.fit(trace[:,4])
+    if plot == True:
+        xmax = max(trace[:,4])
+        xmin = min(trace[:,4])
+        xdata = np.linspace(xmin,xmax,num=500)
+        plt.plot(xdata,gamma.pdf(xdata,alpha,loc,beta))
+        plt.hist(trace[:,4],bins=50,density=True)
+    return alpha,loc,beta
+
+
 def plot_BAR_values(BAR_trace):
     BAR_vector_0_1 = []
     BAR_vector_1_0 = []
@@ -736,18 +744,18 @@ def plot_BAR_values(BAR_trace):
     BAR_vector_0_2 = []
 
     for i in range(len(BAR_trace)):
-        if BAR_trace[i, 0] == 0 and BAR_trace[i, 1] == 1:
-            if str(BAR_trace[i, 2]) != 'nan':
-                BAR_vector_0_1.append(BAR_trace[i, 2])
-        elif BAR_trace[i, 0] == 1 and BAR_trace[i,1] == 0:
-            if str(BAR_trace[i, 2]) != 'nan':
-                BAR_vector_1_0.append(BAR_trace[i, 2])
-        elif BAR_trace[i, 0] == 0 and BAR_trace[i,1] == 2:
-            if str(BAR_trace[i, 2]) != 'nan':
-                BAR_vector_0_2.append(BAR_trace[i, 2])
-        elif BAR_trace[i, 0] == 2 and BAR_trace[i,1] == 0:
-            if str(BAR_trace[i, 2]) != 'nan':
-                BAR_vector_2_0.append(BAR_trace[i, 2])
+        if BAR_trace[i, 0][0] == 0 and BAR_trace[i, 0][1] == 1:
+            if str(BAR_trace[i, 0][2]) != 'nan':
+                BAR_vector_0_1.append(BAR_trace[i, 0][2])
+        elif BAR_trace[i, 0][0] == 1 and BAR_trace[i, 0][1] == 0:
+            if str(BAR_trace[i, 0][2]) != 'nan':
+                BAR_vector_1_0.append(BAR_trace[i, 0][2])
+        elif BAR_trace[i, 0][0] == 0 and BAR_trace[i, 0][1] == 2:
+            if str(BAR_trace[i, 0][2]) != 'nan':
+                BAR_vector_0_2.append(BAR_trace[i, 0][2])
+        elif BAR_trace[i, 0][0] == 2 and BAR_trace[i, 0][1] == 0:
+            if str(BAR_trace[i, 0][2]) != 'nan':
+                BAR_vector_2_0.append(BAR_trace[i, 0][2])
 
     print(len(BAR_vector_0_1))
     print(len(BAR_vector_1_0))
@@ -795,10 +803,46 @@ def unbias_simulation(biasing_factor,probabilities):
     return unbias_prob_normalized
 
 def undo_bar(BAR_Output):
+    '''
     for value in BAR_Output:
         if value == 'No Bar Estimate':
             value[0] = 0
             value.append([0,0])
+    '''
     unnorm_prob = np.asarray([1,1/BAR_Output[0],1/BAR_Output[1]])
     norm_prob = unnorm_prob/sum(unnorm_prob)
     return norm_prob
+
+def compute_multinomial_confidence_intervals(trace):
+    indices=pymbar.timeseries.subsampleCorrelatedData(trace[::10,0])
+
+        
+    confint_trace_USE=trace[indices]
+        
+    
+    trace_model_0=[]
+    trace_model_1=[]
+    trace_model_2=[]
+    for i in range(np.size(confint_trace_USE,0)):
+        if confint_trace_USE[i,0] == 0:
+            trace_model_0.append(confint_trace_USE[i])
+            #log_trace_0.append(logp_trace[i])
+        elif confint_trace_USE[i,0] == 1:
+            trace_model_1.append(confint_trace_USE[i])
+            #log_trace_1.append(logp_trace[i])
+        elif confint_trace_USE[i,0] == 2:
+            trace_model_2.append(confint_trace_USE[i])
+            #log_trace_2.append(logp_trace[i])        
+        
+        
+    trace_model_0=np.asarray(trace_model_0)
+    trace_model_1=np.asarray(trace_model_1)
+    trace_model_2=np.asarray(trace_model_2)
+    
+    counts = np.asarray([len(trace_model_0),len(trace_model_1),len(trace_model_2)])
+ 
+    
+    prob_conf = multinomial_proportions_confint(counts)
+    
+    return prob_conf
+    

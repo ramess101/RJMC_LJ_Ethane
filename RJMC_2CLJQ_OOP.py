@@ -71,6 +71,7 @@ class RJMC_Simulation():
         self.optimum_matching = optimum_matching
         self.tune_for = tune_for
         self.tune_freq = tune_freq
+        self.try_rjmc_move = False
 
     def get_attributes(self):
         """Return attributes of RJMC system
@@ -189,18 +190,18 @@ class RJMC_Simulation():
                 initial_values[0] = 2
 
             if initial_values[0] == 0:
-                initial_values[1] = rnorm(self.opt_params_AUA[0], self.opt_params_AUA[0] / 10)
-                initial_values[2] = rnorm(self.opt_params_AUA[1], self.opt_params_AUA[1] / 10)
-                initial_values[3] = rnorm(self.opt_params_AUA[2], self.opt_params_AUA[2] / 10)
+                initial_values[1] = rnorm(self.opt_params_AUA[0], self.opt_params_AUA[0] / 20)
+                initial_values[2] = rnorm(self.opt_params_AUA[1], self.opt_params_AUA[1] / 20)
+                initial_values[3] = rnorm(self.opt_params_AUA[2], self.opt_params_AUA[2] / 20)
                 initial_values[4] = 0
             elif initial_values[0] == 1:
-                initial_values[1] = rnorm(self.opt_params_AUA_Q[0], self.opt_params_AUA_Q[0] / 10)
-                initial_values[2] = rnorm(self.opt_params_AUA_Q[1], self.opt_params_AUA_Q[1] / 10)
-                initial_values[3] = rnorm(self.opt_params_AUA_Q[2], self.opt_params_AUA_Q[2] / 10)
-                initial_values[4] = rnorm(self.opt_params_AUA_Q[2], self.opt_params_AUA_Q[2] / 10)
+                initial_values[1] = rnorm(self.opt_params_AUA_Q[0], self.opt_params_AUA_Q[0] / 20)
+                initial_values[2] = rnorm(self.opt_params_AUA_Q[1], self.opt_params_AUA_Q[1] / 20)
+                initial_values[3] = rnorm(self.opt_params_AUA_Q[2], self.opt_params_AUA_Q[2] / 20)
+                initial_values[4] = rnorm(self.opt_params_AUA_Q[2], self.opt_params_AUA_Q[2] / 20)
             elif initial_values[0] == 2:
-                initial_values[1] = rnorm(self.opt_params_UA[0], self.opt_params_UA[0] / 10)
-                initial_values[2] = rnorm(self.opt_params_UA[1], self.opt_params_UA[1] / 10)
+                initial_values[1] = rnorm(self.opt_params_UA[0], self.opt_params_UA[0] / 20)
+                initial_values[2] = rnorm(self.opt_params_UA[1], self.opt_params_UA[1] / 20)
                 initial_values[3] = self.NIST_bondlength
                 initial_values[4] = 0
 
@@ -255,17 +256,34 @@ class RJMC_Simulation():
         guess_UA = [guess_2[1], guess_2[2], guess_2[3], guess_2[4]]
 
         # Make sure bounds are in a reasonable range so that models behave properly
-        bnd_AUA = ((0.85 *
-                    guess_AUA[0], guess_AUA[0] *
-                    1.15), (0.90 *
-                            guess_AUA[1], guess_AUA[1] *
-                            1.1), (0.90 *
-                                   guess_AUA[2], guess_AUA[2] *
-                                   1.1), (guess_AUA[3], guess_AUA[3]))
-        bnd_AUA_Q = ((0.85 * guess_AUA_Q[0], guess_AUA_Q[0] * 1.15), (0.9 * guess_AUA_Q[1], guess_AUA_Q[1] * 1.1),
-                     (0.9 * guess_AUA_Q[2], guess_AUA_Q[2] * 1.1), (0.90 * guess_AUA_Q[3], guess_AUA_Q[3] * 1.1))
-        bnd_UA = ((0.85 * guess_UA[0], guess_UA[0] * 1.15), (0.9 * guess_UA[1], guess_UA[1] * 1.1),
-                  (1 * guess_UA[2], guess_UA[2] * 1), (0.90 * guess_UA[3], guess_UA[3] * 1.1))
+        '''
+        bnd_AUA = ((0.85 * guess_AUA[0], guess_AUA[0] *1.15), 
+                   (0.9 * guess_AUA[1], guess_AUA[1] *1.1), 
+                   (0.9 * guess_AUA[2], guess_AUA[2] *1.1),
+                   (0, 0))
+        bnd_AUA_Q = ((0.85 * guess_AUA_Q[0], guess_AUA_Q[0] * 1.15),
+                     (0.9 * guess_AUA_Q[1], guess_AUA_Q[1] * 1.1),
+                     (0.9 * guess_AUA_Q[2], guess_AUA_Q[2] * 1.1),
+                     (0.9 * guess_AUA_Q[3], guess_AUA_Q[3] * 1.1))
+        bnd_UA = ((0.85 * guess_UA[0], guess_UA[0] * 1.15),
+                  (0.9 * guess_UA[1], guess_UA[1] * 1.1),
+                  (1 * guess_UA[2], guess_UA[2] * 1),
+                  (0.90 * guess_UA[3], guess_UA[3] * 1.1))
+        '''
+        
+        bnd_AUA = ((0 * guess_AUA[0], guess_AUA[0] *2), 
+                   (0 * guess_AUA[1], guess_AUA[1] *2), 
+                   (0.5 * guess_AUA[2], guess_AUA[2] *2),
+                   (0, 0))
+        bnd_AUA_Q = ((0 * guess_AUA_Q[0], guess_AUA_Q[0] * 2),
+                     (0 * guess_AUA_Q[1], guess_AUA_Q[1] * 2),
+                     (0 * guess_AUA_Q[2], guess_AUA_Q[2] * 2),
+                     (0 * guess_AUA_Q[3], guess_AUA_Q[3] * 2))
+        bnd_UA = ((0.85 * guess_UA[0], guess_UA[0] * 1.15),
+                  (0.9 * guess_UA[1], guess_UA[1] * 1.1),
+                  (1 * guess_UA[2], guess_UA[2] * 1),
+                  (0.90 * guess_UA[3], guess_UA[3] * 1.1))        
+        
         # Help debug
     #    print(bnd_LJ)
     #    print(bnd_UA)
@@ -414,8 +432,15 @@ class RJMC_Simulation():
                 print('nan detected')
 
         else:
-            proposed_params, proposed_log_prob = self.parameter_proposal(prior, proposed_params, compound_2CLJ)
-            alpha = (proposed_log_prob - self.current_log_prob)
+            if self.try_rjmc_move is True:
+                proposed_params, proposed_log_prob = self.parameter_proposal(prior, proposed_params, compound_2CLJ)
+                BAR_proposed_params, BAR_proposed_log_prob,BAR_rjmc_jacobian = self.try_rjmc(prior, proposed_params, compound_2CLJ)
+                BAR_value = [BAR_proposed_params[0], self.current_params[0], -((BAR_proposed_log_prob - self.current_log_prob) + np.log(BAR_rjmc_jacobian))]
+                self.BAR_trace.append([BAR_value,proposed_params])
+                alpha = (proposed_log_prob - self.current_log_prob)
+            else:
+                proposed_params, proposed_log_prob = self.parameter_proposal(prior, proposed_params, compound_2CLJ)
+                alpha = (proposed_log_prob - self.current_log_prob)
 
         acceptance = self.accept_reject(alpha)
         if acceptance == 'True':
@@ -588,7 +613,12 @@ class RJMC_Simulation():
         trace_equil = self.trace_tuned
         logp_trace_equil = self.logp_trace_tuned
         percent_dev_trace_equil = self.percent_dev_trace_tuned
-
+        self.prob_conf = None
+        try:
+            self.prob_conf = compute_multinomial_confidence_intervals(trace_equil)
+        except pymbar.utils.ParameterError:
+            print('Cannot compute confidence intervals due to only sampling one model')
+            
         # Converts the array with number of model parameters into an array with
         # the number of times there was 1 parameter or 2 parameters
         model_count = np.array([len(trace_equil[trace_equil[:, 0] == 0]), len(
@@ -606,6 +636,9 @@ class RJMC_Simulation():
         self.prob = [prob_0, prob_1, prob_2]
 
         self.Exp_ratio = [prob_0 / prob_1, prob_0/prob_2]
+        
+        if self.prob_conf is not None:
+            print('95% confidence intervals for probability',self.prob_conf)
         
 
         print('Experimental sampling ratio:', self.Exp_ratio)
@@ -874,7 +907,8 @@ class RJMC_Simulation():
                    'Transition Matrix': self.transition_matrix,
                    'Model Probabilities': self.prob,
                    'Timestamp': str(datetime.today()),
-                   'Bayes Factors (Sampling Ratio)': self.Exp_ratio}
+                   'Bayes Factors (Sampling Ratio)': self.Exp_ratio,
+                   'Model Probability confidence intervals':self.prob_conf}
         if self.BF_BAR is not None:
             results['Bayes Factors (BAR)'] = self.BF_BAR
 
@@ -889,6 +923,32 @@ class RJMC_Simulation():
         np.save(path + '/trace/logp_trace.npy', self.logp_trace_tuned)
         np.save(path + '/trace/percent_dev_trace_tuned.npy', self.percent_dev_trace_tuned)
         np.save(path + '/trace/BAR_trace.npy',self.BAR_trace)
+        
+    def try_rjmc(self,prior,proposed_params,compound_2CLJ):
+        
+        proposed_model = copy.deepcopy(proposed_params[0])
+
+        # Propose new model to jump to
+        while proposed_model == proposed_params[0]:
+            proposed_model = int(np.floor(np.random.random() * self.n_models))
+            if proposed_model == 2 and self.current_model == 1:
+                proposed_model = proposed_params[0]
+            elif proposed_model == 1 and self.current_model == 2:
+                proposed_model = proposed_params[0]
+        self.lamda = 5
+        proposed_params[0] = proposed_model
+        self.w = 1
+
+        proposed_params = self.model_transition(proposed_model, proposed_params)
+
+        proposed_log_prob = self.calc_posterior(prior, compound_2CLJ, proposed_params)
+        jacobian_matrix = self.jacobian()
+        rjmc_jacobian = jacobian_matrix[self.current_model, proposed_model]
+        transition_matrix = self.transition_function()
+        rjmc_transition = transition_matrix[int(proposed_params[0]), proposed_model]
+        # Return values of jacobian in order to properly calculate accept/reject
+        return proposed_params, proposed_log_prob, rjmc_transition
+        
 
 
 class RJMC_Prior():
@@ -992,7 +1052,7 @@ def main():
                         required=False)
 
     parser.add_argument('--biasing_factor', '-b',
-                        type=list,
+                        type=str,
                         help='Biasing factors for each model',
                         required=False)
     parser.add_argument('--label', '-l',
@@ -1020,6 +1080,7 @@ def main():
 
     args = parser.parse_args()
     print(args.compound)
+
 
     compound = args.compound
     # T_range=args.trange

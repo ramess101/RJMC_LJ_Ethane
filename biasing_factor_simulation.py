@@ -224,18 +224,6 @@ def main():
     prior.L_prior()
     prior.Q_prior()
     
-    UA_logp_trace=do_UA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
-    
-    AUA_Q_logp_trace=do_AUA_Q_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
-    
-    AUA_logp_trace=do_AUA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
-    
-    UA_biasing_factor,AUA_Q_biasing_factor=compute_biasing_factors(UA_logp_trace, AUA_logp_trace, AUA_Q_logp_trace)
-    
-    biasing_factor=np.asarray([0, AUA_Q_biasing_factor, UA_biasing_factor])
-    print('Biasing factor', biasing_factor)
-    
-
     mcmc_prior_simulation = RJMC_Simulation(compound,
                                             T_range,
                                             properties,
@@ -253,7 +241,8 @@ def main():
     mcmc_prior_simulation.RJMC_Outerloop(prior, compound_2CLJ)
     mcmc_prior_simulation.Report()
     prior_values['Q'][1] = mcmc_prior_simulation.refit_prior(prior_values)
-
+    
+    
     print('Refitting Prior for Q')
 
     prior = RJMC_Prior(prior_values)
@@ -261,6 +250,19 @@ def main():
     prior.sigma_prior()
     prior.L_prior()
     prior.Q_prior()
+
+    
+    UA_logp_trace=do_UA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
+    
+    AUA_Q_logp_trace=do_AUA_Q_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
+    
+    AUA_logp_trace=do_AUA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
+    
+    UA_biasing_factor,AUA_Q_biasing_factor=compute_biasing_factors(UA_logp_trace, AUA_logp_trace, AUA_Q_logp_trace)
+    
+    biasing_factor=np.asarray([0, AUA_Q_biasing_factor, UA_biasing_factor])
+    print('Biasing factor', biasing_factor)
+    
 
     rjmc_simulator = RJMC_Simulation(compound,
                                      T_range,
