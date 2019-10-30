@@ -187,10 +187,10 @@ def main():
     save_traj = False
 
     prior_values = {
-        'epsilon': ['exponential', [400]],
-        'sigma': ['exponential', [5]],
-        'L': ['exponential', [3]],
-        'Q': ['exponential', [1]]}
+        'epsilon': ['exponential', [0,400]],
+        'sigma': ['exponential', [0,5]],
+        'L': ['exponential', [0,3]],
+        'Q': ['exponential', [0,1]]}
 
 
     args=parse_args()
@@ -240,7 +240,7 @@ def main():
                                             initial_model='AUA+Q')
     mcmc_prior_simulation.RJMC_Outerloop(prior, compound_2CLJ)
     mcmc_prior_simulation.Report()
-    prior_values['Q'][1] = mcmc_prior_simulation.refit_prior(prior_values)
+    prior_values['Q'] = mcmc_prior_simulation.refit_prior('gamma')
     
     
     print('Refitting Prior for Q')
