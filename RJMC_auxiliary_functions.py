@@ -16,7 +16,7 @@ from LennardJones_correlations import LennardJones
 from LennardJones_2Center_correlations import LennardJones_2C
 from scipy.stats import distributions
 from scipy.stats import linregress
-from scipy.stats import gamma,expon
+from scipy.stats import gengamma,expon
 from scipy.optimize import minimize,curve_fit
 import random as rm
 from datetime import datetime,date
@@ -708,11 +708,12 @@ def fit_exponential_sp(trace,plot=False):
         xmax = max(trace[:,4])
         xmin = min(trace[:,4])
         xdata = np.linspace(xmin,xmax,num=500)
-        plt.plot(xdata,gamma.pdf(xdata,loc,scale))
+        plt.plot(xdata,expon.pdf(xdata,loc,scale))
         plt.hist(trace[:,4],bins=50,density=True)
     return loc,scale
 
 def fit_gamma(trace,bins=25):
+    #DONT USE
     y,x=np.histogram(trace,bins=bins,density=True)
     x_adjust=[]
     for i in range(len(x)-1):
@@ -727,14 +728,14 @@ def fit_gamma(trace,bins=25):
     return popt
 
 def fit_gamma_sp(trace,plot=False):
-    alpha,loc,beta = gamma.fit(trace[:,4])
+    alpha, beta, loc, scale = gengamma.fit(trace[:,4])
     if plot == True:
         xmax = max(trace[:,4])
         xmin = min(trace[:,4])
         xdata = np.linspace(xmin,xmax,num=500)
-        plt.plot(xdata,gamma.pdf(xdata,alpha,loc,beta))
+        plt.plot(xdata,gengamma.pdf(xdata,alpha,beta,loc,scale))
         plt.hist(trace[:,4],bins=50,density=True)
-    return alpha,loc,beta
+    return alpha, beta, loc, scale
 
 
 def plot_BAR_values(BAR_trace):
@@ -812,6 +813,25 @@ def undo_bar(BAR_Output):
     unnorm_prob = np.asarray([1,1/BAR_Output[0],1/BAR_Output[1]])
     norm_prob = unnorm_prob/sum(unnorm_prob)
     return norm_prob
+
+def find_maxima(trace):
+    num_bins=20
+    hist=np.histogramdd(trace[:,1:],bins=num_bins,density=True)
+    val = hist[0].max()
+    for i in range(num_bins):
+        for j in range(num_bins):
+            for k in range(num_bins):
+                for l in range(num_bins):
+                    if hist[0][i][j][k][l] == val:
+                        print('LOCK ON')
+                        key = [i,j,k,l]
+                        break
+    max_values = []
+    for index in range(len(key)):
+        low=hist[1][index][key[index]]
+        high=hist[1][index][key[index]]
+        max_values.append((low+high)/2)
+    return key,np.asarray(max_values)
 
 def compute_multinomial_confidence_intervals(trace):
     indices=pymbar.timeseries.subsampleCorrelatedData(trace[::10,0])

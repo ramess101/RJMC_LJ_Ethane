@@ -18,6 +18,7 @@ from LennardJones_2Center_correlations import LennardJones_2C
 from scipy.stats import distributions
 from scipy.stats import linregress
 from scipy.optimize import minimize
+from scipy.stats import expon,gengamma
 import random as rm
 from pymc3.stats import hpd
 from RJMC_auxiliary_functions import *
@@ -142,7 +143,7 @@ def main():
                                             T_range,
                                             properties,
                                             n_points,
-                                            1 * 10**6,
+                                            5 * 10**4,
                                             0.0,
                                             biasing_factor,
                                             optimum_matching)
@@ -154,8 +155,12 @@ def main():
                                             initial_model='AUA+Q')
     mcmc_prior_simulation.RJMC_Outerloop(prior, compound_2CLJ)
     mcmc_prior_simulation.Report()
-    prior_values['Q'] = mcmc_prior_simulation.refit_prior(prior_values,prior_type='exponential')
-    print(prior_values['Q'][1])
+    prior_values['Q'] = mcmc_prior_simulation.refit_prior('gamma')
+    print(prior_values['Q'])
+    plt.hist(mcmc_prior_simulation.trace_model_1[:,4],bins=50,density=True)
+    plt.plot(np.linspace(0,1,num=500),gengamma.pdf(np.linspace(0,1,num=500),*prior_values['Q'][1]))
+    plt.plot(np.linspace(0,1,num=500),expon.pdf(np.linspace(0,1,num=500),0,400))
+    plt.show()
 
     print('Refitting Prior for Q')
 
@@ -164,7 +169,13 @@ def main():
     prior.sigma_prior()
     prior.L_prior()
     prior.Q_prior()
-
+    
+    print(prior.Q_prior_values)
+    '''
+    plt.hist(mcmc_prior_simulation.trace_model_1[:,4],bins=50,density=True)
+    plt.plot(np.linspace(0,1,num=500),expon.pdf(np.linspace(0,1,num=500),*prior.Q_prior_values))
+    plt.show()
+    '''
     rjmc_simulator = RJMC_Simulation(compound,
                                      T_range,
                                      properties,

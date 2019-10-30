@@ -256,7 +256,7 @@ class RJMC_Simulation():
         guess_UA = [guess_2[1], guess_2[2], guess_2[3], guess_2[4]]
 
         # Make sure bounds are in a reasonable range so that models behave properly
-        '''
+        
         bnd_AUA = ((0.85 * guess_AUA[0], guess_AUA[0] *1.15), 
                    (0.9 * guess_AUA[1], guess_AUA[1] *1.1), 
                    (0.9 * guess_AUA[2], guess_AUA[2] *1.1),
@@ -283,7 +283,7 @@ class RJMC_Simulation():
                   (0.9 * guess_UA[1], guess_UA[1] * 1.1),
                   (1 * guess_UA[2], guess_UA[2] * 1),
                   (0.90 * guess_UA[3], guess_UA[3] * 1.1))        
-        
+        '''
         # Help debug
     #    print(bnd_LJ)
     #    print(bnd_UA)
@@ -776,14 +776,18 @@ class RJMC_Simulation():
         
         return  BAR_probabilities_USE
         
-    def refit_prior(self, prior_type='exponential'):
+    def refit_prior(self, prior_type):
         if prior_type == 'exponential':
-            new_prior = fit_exponential_sp(self.trace_model_1)
+            loc,scale = fit_exponential_sp(self.trace_model_1)
+            new_prior = (0,scale)
 
             Q_prior = [prior_type,new_prior]
         elif prior_type == 'gamma':
-            new_prior = fit_gamma_sp(self.trace_model_1)
+            alpha, beta,loc,scale = fit_gamma_sp(self.trace_model_1)
+            new_prior = (alpha,beta,0,scale)
             Q_prior = [prior_type,new_prior]
+        else:
+            raise ValueError('Prior type not implemented')
         return Q_prior
 
     def write_output(self, prior_dict, tag=None, save_traj=False):
@@ -965,6 +969,7 @@ class RJMC_Prior():
 
         self.dnorm = distributions.norm
         self.dgamma = distributions.gamma
+        self.dgengamma = distributions.gengamma
         self.duni = distributions.uniform
         self.dlogit = distributions.logistic
         self.dexp = distributions.expon
@@ -976,8 +981,8 @@ class RJMC_Prior():
             self.epsilon_prior_function = self.dexp
             self.epsilon_prior_values = [eps_prior_vals[0],eps_prior_vals[1]]
         elif eps_prior_type == 'gamma':
-            self.epsilon_prior_function = self.dgamma
-            self.epsilon_prior_values = [eps_prior_vals[0], eps_prior_vals[1],eps_prior_vals[2]]
+            self.epsilon_prior_function = self.dgengamma
+            self.epsilon_prior_values = [eps_prior_vals[0], eps_prior_vals[1],eps_prior_vals[2],eps_prior_vals[3]]
 
     def sigma_prior(self):
         sig_prior_type, sig_prior_vals = self.prior_dict['sigma']
@@ -986,8 +991,8 @@ class RJMC_Prior():
             self.sigma_prior_function = self.dexp
             self.sigma_prior_values = [sig_prior_vals[0],sig_prior_vals[1]]
         elif sig_prior_type == 'gamma':
-            self.sigma_prior_function = self.dgamma
-            self.sigma_prior_values = [sig_prior_vals[0], sig_prior_vals[1],sig_prior_vals[2]]
+            self.sigma_prior_function = self.dgengamma
+            self.sigma_prior_values = [sig_prior_vals[0], sig_prior_vals[1],sig_prior_vals[2],sig_prior_vals[2]]
 
     def L_prior(self):
         L_prior_type, L_prior_vals = self.prior_dict['L']
@@ -996,8 +1001,8 @@ class RJMC_Prior():
             self.L_prior_function = self.dexp
             self.L_prior_values = [L_prior_vals[0],L_prior_vals[1]]
         elif L_prior_type == 'gamma':
-            self.L_prior_function = self.dgamma
-            self.L_prior_values = [L_prior_vals[0], L_prior_vals[1], L_prior_vals[2]]
+            self.L_prior_function = self.dgengamma
+            self.L_prior_values = [L_prior_vals[0], L_prior_vals[1], L_prior_vals[2],L_prior_vals[3]]
 
     def Q_prior(self):
         Q_prior_type, Q_prior_vals = self.prior_dict['Q']
@@ -1006,8 +1011,8 @@ class RJMC_Prior():
             self.Q_prior_function = self.dexp
             self.Q_prior_values = [Q_prior_vals[0], Q_prior_vals[1]]
         elif Q_prior_type == 'gamma':
-            self.Q_prior_function = self.dgamma
-            self.Q_prior_values = [Q_prior_vals[0], Q_prior_vals[1], Q_prior_vals[2]]
+            self.Q_prior_function = self.dgengamma
+            self.Q_prior_values = [Q_prior_vals[0], Q_prior_vals[1], Q_prior_vals[2],Q_prior_vals[3]]
 
 
 def main():

@@ -190,7 +190,7 @@ def main():
         'epsilon': ['exponential', [0,400]],
         'sigma': ['exponential', [0,5]],
         'L': ['exponential', [0,3]],
-        'Q': ['exponential', [0,1]]}
+        'Q': ['exponential', [0,10]]}
 
 
     args=parse_args()
@@ -223,7 +223,7 @@ def main():
     prior.sigma_prior()
     prior.L_prior()
     prior.Q_prior()
-    
+    '''
     mcmc_prior_simulation = RJMC_Simulation(compound,
                                             T_range,
                                             properties,
@@ -240,17 +240,17 @@ def main():
                                             initial_model='AUA+Q')
     mcmc_prior_simulation.RJMC_Outerloop(prior, compound_2CLJ)
     mcmc_prior_simulation.Report()
-    prior_values['Q'] = mcmc_prior_simulation.refit_prior('exponential')
+    prior_values['Q'] = mcmc_prior_simulation.refit_prior('gamma')
     
     
     print('Refitting Prior for Q')
-
+    
     prior = RJMC_Prior(prior_values)
     prior.epsilon_prior()
     prior.sigma_prior()
     prior.L_prior()
     prior.Q_prior()
-
+    '''
     
     UA_logp_trace=do_UA_simulation(compound,T_range,properties,n_points,biasing_factor,optimum_matching,prior)
     
