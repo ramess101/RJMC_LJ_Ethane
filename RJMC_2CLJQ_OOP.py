@@ -266,7 +266,7 @@ class RJMC_Simulation():
         guess_UA = [guess_2[1], guess_2[2], guess_2[3], guess_2[4]]
 
         # Make sure bounds are in a reasonable range so that models behave properly
-        
+        '''
         bnd_AUA = ((0.85 * guess_AUA[0], guess_AUA[0] *1.15), 
                    (0.9 * guess_AUA[1], guess_AUA[1] *1.1), 
                    (0.9 * guess_AUA[2], guess_AUA[2] *1.1),
@@ -293,7 +293,7 @@ class RJMC_Simulation():
                   (0.9 * guess_UA[1], guess_UA[1] * 1.1),
                   (1 * guess_UA[2], guess_UA[2] * 1),
                   (0.90 * guess_UA[3], guess_UA[3] * 1.1))        
-        '''
+        
         # Help debug
     #    print(bnd_LJ)
     #    print(bnd_UA)
@@ -306,6 +306,7 @@ class RJMC_Simulation():
     #    print(opt_LJ)
     #    print(opt_UA)
     #    print(opt_AUA)
+
 
         self.opt_params_AUA = opt_AUA.x[0], opt_AUA.x[1], opt_AUA.x[2], opt_AUA.x[3]
         self.opt_params_AUA_Q = opt_AUA_Q.x[0], opt_AUA_Q.x[1], opt_AUA_Q.x[2], opt_AUA_Q.x[3]
@@ -509,6 +510,8 @@ class RJMC_Simulation():
                 proposed_params[1] = (self.opt_params_AUA_Q[0] / self.opt_params_AUA[0]) * proposed_params[1]
                 proposed_params[2] = (self.opt_params_AUA_Q[1] / self.opt_params_AUA[1]) * proposed_params[2]
                 proposed_params[3] = (self.opt_params_AUA_Q[2] / self.opt_params_AUA[2]) * proposed_params[3]
+
+                
 
             self.w = np.random.random()
 
@@ -799,6 +802,15 @@ class RJMC_Simulation():
         else:
             raise ValueError('Prior type not implemented')
         return Q_prior
+
+    def load_custom_map(self,list_params):
+        if list_params is None:
+            raise ValueError('Must supply list of params')
+        if not isinstance(list_params,list):
+            raise ValueError('List of params must be of type "list"')
+
+        #print(list_params[0],list_params[1],list_params[2])
+        return list_params[0],list_params[1],list_params[2]
 
     def write_output(self, prior_dict, tag=None, save_traj=False):
 

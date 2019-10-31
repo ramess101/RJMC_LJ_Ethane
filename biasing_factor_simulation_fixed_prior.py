@@ -190,7 +190,7 @@ def main():
         'epsilon': ['exponential', [0,400]],
         'sigma': ['exponential', [0,5]],
         'L': ['exponential', [0,3]],
-        'Q': ['exponential', [0,10]]}
+        'Q': ['exponential', [0,1]]}
 
 
     args=parse_args()

@@ -866,3 +866,10 @@ def compute_multinomial_confidence_intervals(trace):
     
     return prob_conf
     
+def create_map(aua_path,auaq_path):
+    aua_trace = np.load(aua_path)
+    auaq_trace = np.load(auaq_path)
+    
+    aua_max_like = find_maxima(aua_trace)[1]
+    auaq_max_like = find_maxima(auaq_trace)[1]
+    return aua_max_like,auaq_max_like

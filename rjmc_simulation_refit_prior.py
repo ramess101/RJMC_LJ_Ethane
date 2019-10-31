@@ -143,7 +143,7 @@ def main():
                                             T_range,
                                             properties,
                                             n_points,
-                                            1 * 10**5,
+                                            5 * 10**5,
                                             0.0,
                                             biasing_factor,
                                             optimum_matching)
@@ -155,12 +155,12 @@ def main():
                                             initial_model='AUA+Q')
     mcmc_prior_simulation.RJMC_Outerloop(prior, compound_2CLJ)
     mcmc_prior_simulation.Report()
-    prior_values['Q'] = mcmc_prior_simulation.refit_prior('gamma')
+    prior_values['Q'] = mcmc_prior_simulation.refit_prior('exponential')
     print(prior_values['Q'])
-    plt.hist(mcmc_prior_simulation.trace_model_1[:,4],bins=50,density=True)
-    plt.plot(np.linspace(0,1,num=500),gengamma.pdf(np.linspace(0,1,num=500),*prior_values['Q'][1]))
+    #plt.hist(mcmc_prior_simulation.trace_model_1[:,4],bins=50,density=True)
+    #plt.plot(np.linspace(0,1,num=500),gengamma.pdf(np.linspace(0,1,num=500),*prior_values['Q'][1]))
     #plt.plot(np.linspace(0,1,num=500),expon.pdf(np.linspace(0,1,num=500),0,400))
-    plt.show()
+    #plt.show()
 
     print('Refitting Prior for Q')
 
@@ -176,6 +176,13 @@ def main():
     plt.plot(np.linspace(0,1,num=500),expon.pdf(np.linspace(0,1,num=500),*prior.Q_prior_values))
     plt.show()
     '''
+    
+    
+    aua_path = 'output/C2H2/rhol+Psat/C2H2_rhol+Psat_2000000_aua_only_2019-10-25/trace/trace.npy'
+    auaq_path = 'output/C2H2/rhol+Psat/C2H2_rhol+Psat_2000000_auaq_only_2019-10-25/trace/trace.npy'
+    
+    aua_max,auaq_max = create_map(aua_path,auaq_path)
+    
     rjmc_simulator = RJMC_Simulation(compound,
                                      T_range,
                                      properties,
@@ -189,12 +196,16 @@ def main():
 
     print('Simulation Attributes:', rjmc_simulator.get_attributes())
 
+
     compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w)
 
     rjmc_simulator.gen_Tmatrix(prior, compound_2CLJ)
-    print(rjmc_simulator.opt_params_AUA)
     rjmc_simulator.set_initial_state(prior, compound_2CLJ)
+    
+    custom_map = list([list(aua_max),list(auaq_max),list(rjmc_simulator.opt_params_UA)])
 
+    
+    rjmc_simulator.opt_params_AUA,rjmc_simulator.opt_params_AUA_Q,rjmc_simulator.opt_params_UA = rjmc_simulator.load_custom_map(custom_map)
     rjmc_simulator.RJMC_Outerloop(prior, compound_2CLJ)
     trace, logp_trace, percent_dev_trace,BAR_trace = rjmc_simulator.Report(USE_BAR=True)
     rjmc_simulator.write_output(prior_values, tag=tag, save_traj=save_traj)
