@@ -31,7 +31,7 @@ from RJMC_2CLJQ_OOP import RJMC_Simulation, RJMC_Prior
 
 
 def main():
-    compound = 'C2F4'
+    compound = 'Br2'
     properties = 'rhol+Psat'
     T_range = [0.55, 0.95]
     n_points = 10

@@ -728,7 +728,7 @@ def fit_gamma(trace,bins=25):
     return popt
 
 def fit_gamma_sp(trace,plot=False):
-    alpha, beta, loc, scale = gengamma.fit(trace[:,4])
+    alpha, beta, loc, scale = gengamma.fit(trace[:,4],loc=0)
     if plot == True:
         xmax = max(trace[:,4])
         xmin = min(trace[:,4])

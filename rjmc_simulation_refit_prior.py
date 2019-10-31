@@ -143,7 +143,7 @@ def main():
                                             T_range,
                                             properties,
                                             n_points,
-                                            5 * 10**4,
+                                            1 * 10**5,
                                             0.0,
                                             biasing_factor,
                                             optimum_matching)
@@ -159,7 +159,7 @@ def main():
     print(prior_values['Q'])
     plt.hist(mcmc_prior_simulation.trace_model_1[:,4],bins=50,density=True)
     plt.plot(np.linspace(0,1,num=500),gengamma.pdf(np.linspace(0,1,num=500),*prior_values['Q'][1]))
-    plt.plot(np.linspace(0,1,num=500),expon.pdf(np.linspace(0,1,num=500),0,400))
+    #plt.plot(np.linspace(0,1,num=500),expon.pdf(np.linspace(0,1,num=500),0,400))
     plt.show()
 
     print('Refitting Prior for Q')

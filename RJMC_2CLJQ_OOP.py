@@ -131,9 +131,19 @@ class RJMC_Simulation():
         dnorm = distributions.norm.logpdf
 
         logp = 0
+        
+        '''
+        if chain_values[1] or chain_values[2] or chain_values[3] <= 0:
+            #disallow values below 0 as nonphysical
+            #print('Reject negative value')
+            logp = -1*np.inf
+        '''   
+        
         logp += prior.sigma_prior_function.logpdf(chain_values[2], *prior.sigma_prior_values)
         logp += prior.epsilon_prior_function.logpdf(chain_values[1], *prior.epsilon_prior_values)
         # Create priors for parameters common to all models
+        
+        
         if chain_values[0] == 2:
             chain_values[4] = 0
             logp += self.biasing_factor[2]
@@ -784,7 +794,7 @@ class RJMC_Simulation():
             Q_prior = [prior_type,new_prior]
         elif prior_type == 'gamma':
             alpha, beta,loc,scale = fit_gamma_sp(self.trace_model_1)
-            new_prior = (alpha,beta,0,scale)
+            new_prior = (alpha,beta,loc,scale)
             Q_prior = [prior_type,new_prior]
         else:
             raise ValueError('Prior type not implemented')
