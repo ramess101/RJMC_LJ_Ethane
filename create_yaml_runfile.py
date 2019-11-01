@@ -13,7 +13,7 @@ import os
 simulation_params = {}
 
 #BASIC PARAMS
-simulation_params['compound'] = 'C2H4'
+simulation_params['compound'] = 'C2H2'
 # Compound to use (C2H2,C2H4,C2H6,C2F4,O2,N2,Br2,F2)
 simulation_params['properties'] = 'rhol+Psat'
 # Which properties to simulate ('rhol','rhol+Psat','All')
@@ -40,7 +40,7 @@ simulation_params['optimum_matching'] = ['True','True']
 simulation_params['biasing_factor'] = [0,0,0]
 #Corresponds to [AUA,AUAQ,UA]
 
-simulation_params['simulation_type'] = 'Refit_Prior'
+simulation_params['simulation_type'] = 'Biasing_Factor'
 #'Basic', 'Refit_Prior' or 'Biasing_Factor'
 
 simulation_params['opt_bounds'] = 'Expanded'
@@ -78,7 +78,7 @@ if simulation_params['simulation_type'] == 'Biasing_Factor':
     if simulation_params['refit_prior'] is True:
         simulation_params['single_simulation_length'] = 100000
         simulation_params['refit_prior_to'] = 'exponential'
-    simulation_params['use_MAP'] = False
+    simulation_params['use_MAP'] = True
     if simulation_params['use_MAP'] == True:
         simulation_params['MAP_simulations'] = ['output/C2H2/rhol+Psat/C2H2_rhol+Psat_2000000_aua_only_2019-10-25/trace/trace.npy',
          'output/C2H2/rhol+Psat/C2H2_rhol+Psat_2000000_auaq_only_2019-10-25/trace/trace.npy']

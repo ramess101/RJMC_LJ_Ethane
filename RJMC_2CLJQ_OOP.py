@@ -21,7 +21,7 @@ from scipy.optimize import minimize
 import random as rm
 from pymc3.stats import hpd
 from RJMC_auxiliary_functions import *
-from datetime import date
+from datetime import date, datetime
 import copy
 import pymbar
 from pymbar import BAR, timeseries
@@ -31,6 +31,8 @@ import os
 from shutil import rmtree
 import math
 from tqdm import tqdm
+import csv
+import pickle
 
 class RJMC_Simulation():
     """ Builds an object that runs an RJMC simulation based on the parameters the user gives to it
@@ -916,18 +918,20 @@ class RJMC_Simulation():
                       'Surface Tension Uncertainties': self.thermo_data_SurfTens[:, 2],
                       'Literature Critical Temperature': self.Tc_lit[0]}
 
-        f = open(path + '/datapoints.txt', "w")
-        f.write(str(datapoints))
-        f.close()
+
+        filename = path + '/datapoints.pkl'
+
+        with open(filename, 'wb') as f:
+            pickle.dump(datapoints,f)
 
     def write_metadata(self, path, prior_dict):
 
         metadata = self.get_attributes()
+        filename = path + '/metadata.pkl'
 
-        f = open(path + '/metadata.txt', "w")
-        f.write(str(metadata))
-        f.write(str(prior_dict))
-        f.close()
+        with open(filename, 'wb') as f:
+            pickle.dump(metadata,f)
+
 
     def write_simulation_results(self, path):
         results = {'Proposed Moves': self.move_proposals,
@@ -943,9 +947,13 @@ class RJMC_Simulation():
         if self.BF_BAR is not None:
             results['Bayes Factors (BAR)'] = self.BF_BAR
 
-        f = open(path + '/results.txt', "w")
-        f.write(str(results))
-        f.close()
+
+
+        filename = path + '/results.pkl'
+        with open(filename, 'wb') as f:
+            pickle.dump(results,f)
+               
+
 
     def write_traces(self, path):
         if os.path.isdir(path + '/trace') == False:
