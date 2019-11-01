@@ -72,6 +72,7 @@ class RJMC_Simulation():
         self.tune_for = tune_for
         self.tune_freq = tune_freq
         self.try_rjmc_move = False
+        self.optimum_bounds = 'Normal'
 
     def get_attributes(self):
         """Return attributes of RJMC system
@@ -266,34 +267,35 @@ class RJMC_Simulation():
         guess_UA = [guess_2[1], guess_2[2], guess_2[3], guess_2[4]]
 
         # Make sure bounds are in a reasonable range so that models behave properly
-        '''
-        bnd_AUA = ((0.85 * guess_AUA[0], guess_AUA[0] *1.15), 
-                   (0.9 * guess_AUA[1], guess_AUA[1] *1.1), 
-                   (0.9 * guess_AUA[2], guess_AUA[2] *1.1),
-                   (0, 0))
-        bnd_AUA_Q = ((0.85 * guess_AUA_Q[0], guess_AUA_Q[0] * 1.15),
-                     (0.9 * guess_AUA_Q[1], guess_AUA_Q[1] * 1.1),
-                     (0.9 * guess_AUA_Q[2], guess_AUA_Q[2] * 1.1),
-                     (0.9 * guess_AUA_Q[3], guess_AUA_Q[3] * 1.1))
-        bnd_UA = ((0.85 * guess_UA[0], guess_UA[0] * 1.15),
-                  (0.9 * guess_UA[1], guess_UA[1] * 1.1),
-                  (1 * guess_UA[2], guess_UA[2] * 1),
-                  (0.90 * guess_UA[3], guess_UA[3] * 1.1))
-        '''
-        
-        bnd_AUA = ((0 * guess_AUA[0], guess_AUA[0] *2), 
-                   (0 * guess_AUA[1], guess_AUA[1] *2), 
-                   (0.5 * guess_AUA[2], guess_AUA[2] *2),
-                   (0, 0))
-        bnd_AUA_Q = ((0 * guess_AUA_Q[0], guess_AUA_Q[0] * 2),
-                     (0 * guess_AUA_Q[1], guess_AUA_Q[1] * 2),
-                     (0 * guess_AUA_Q[2], guess_AUA_Q[2] * 2),
-                     (0 * guess_AUA_Q[3], guess_AUA_Q[3] * 2))
-        bnd_UA = ((0.85 * guess_UA[0], guess_UA[0] * 1.15),
-                  (0.9 * guess_UA[1], guess_UA[1] * 1.1),
-                  (1 * guess_UA[2], guess_UA[2] * 1),
-                  (0.90 * guess_UA[3], guess_UA[3] * 1.1))        
-        
+        if self.optimum_bounds == 'Normal':
+            bnd_AUA = ((0.85 * guess_AUA[0], guess_AUA[0] *1.15), 
+                       (0.9 * guess_AUA[1], guess_AUA[1] *1.1), 
+                       (0.9 * guess_AUA[2], guess_AUA[2] *1.1),
+                       (0, 0))
+            bnd_AUA_Q = ((0.85 * guess_AUA_Q[0], guess_AUA_Q[0] * 1.15),
+                         (0.9 * guess_AUA_Q[1], guess_AUA_Q[1] * 1.1),
+                         (0.9 * guess_AUA_Q[2], guess_AUA_Q[2] * 1.1),
+                         (0.9 * guess_AUA_Q[3], guess_AUA_Q[3] * 1.1))
+            bnd_UA = ((0.85 * guess_UA[0], guess_UA[0] * 1.15),
+                      (0.9 * guess_UA[1], guess_UA[1] * 1.1),
+                      (1 * guess_UA[2], guess_UA[2] * 1),
+                      (0.90 * guess_UA[3], guess_UA[3] * 1.1))
+        elif self.optimum_bounds == 'Expanded':
+            
+            bnd_AUA = ((0 * guess_AUA[0], guess_AUA[0] *2), 
+                       (0 * guess_AUA[1], guess_AUA[1] *2), 
+                       (0.5 * guess_AUA[2], guess_AUA[2] *2),
+                       (0, 0))
+            bnd_AUA_Q = ((0 * guess_AUA_Q[0], guess_AUA_Q[0] * 2),
+                         (0 * guess_AUA_Q[1], guess_AUA_Q[1] * 2),
+                         (0 * guess_AUA_Q[2], guess_AUA_Q[2] * 2),
+                         (0 * guess_AUA_Q[3], guess_AUA_Q[3] * 2))
+            bnd_UA = ((0.85 * guess_UA[0], guess_UA[0] * 1.15),
+                      (0.9 * guess_UA[1], guess_UA[1] * 1.1),
+                      (1 * guess_UA[2], guess_UA[2] * 1),
+                      (0.90 * guess_UA[3], guess_UA[3] * 1.1))        
+        else: 
+            raise ValueError('optimum_bounds must be "Normal" or "Expanded"')
         # Help debug
     #    print(bnd_LJ)
     #    print(bnd_UA)

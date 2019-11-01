@@ -19,7 +19,8 @@ from scipy.stats import linregress
 from scipy.stats import gengamma,expon
 from scipy.optimize import minimize,curve_fit
 import random as rm
-from datetime import datetime,date
+
+
 import copy
 import math
 import pymbar

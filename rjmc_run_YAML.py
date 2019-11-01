@@ -58,7 +58,7 @@ def basic(simulation_params):
     print('Simulation Attributes:', rjmc_simulator.get_attributes())
 
     compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w)
-
+    rjmc_simulator.optimum_bounds = simulation_params['opt_bounds']
     rjmc_simulator.gen_Tmatrix(prior, compound_2CLJ)
     # print(rjmc_simulator.opt_params_AUA)
     rjmc_simulator.set_initial_state(prior, compound_2CLJ)
@@ -95,6 +95,7 @@ def refit_prior(simulation_params):
                                      simulation_params['optimum_matching'])
     mcmc_prior_simulation.prepare_data()
     compound_2CLJ = LennardJones_2C(mcmc_prior_simulation.M_w)
+    mcmc_prior_simulation.optimum_bounds = simulation_params['opt_bounds']
     mcmc_prior_simulation.gen_Tmatrix(prior, compound_2CLJ)
     mcmc_prior_simulation.set_initial_state(prior,
                                             compound_2CLJ,
@@ -128,7 +129,7 @@ def refit_prior(simulation_params):
 
 
     compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w)
-
+    rjmc_simulator.optimum_bounds = simulation_params['opt_bounds']
     rjmc_simulator.gen_Tmatrix(prior, compound_2CLJ)
     rjmc_simulator.set_initial_state(prior, compound_2CLJ)
 
@@ -257,7 +258,7 @@ def biasing_factor(simulation_params):
     print('Simulation Attributes:', rjmc_simulator.get_attributes())
 
     compound_2CLJ = LennardJones_2C(rjmc_simulator.M_w)
-
+    rjmc_simulator.optimum_bounds = simulation_params['opt_bounds']
     rjmc_simulator.gen_Tmatrix(prior, compound_2CLJ)
     # print(rjmc_simulator.opt_params_AUA)
     rjmc_simulator.set_initial_state(prior, compound_2CLJ)
