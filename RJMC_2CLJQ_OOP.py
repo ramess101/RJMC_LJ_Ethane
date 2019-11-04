@@ -657,6 +657,12 @@ class RJMC_Simulation():
         if self.prob_conf is not None:
             print('95% confidence intervals for probability',self.prob_conf)
         
+        if self.biasing_factor != [0,0,0]:
+            self.unbiased_prob = unbias_simulation(self.biasing_factor,self.prob)
+            print('Unbiased probabilities')
+        else:
+            self.unbiased_prob = self.prob
+
 
         print('Experimental sampling ratio:', self.Exp_ratio)
         print('==============================')
@@ -943,7 +949,8 @@ class RJMC_Simulation():
                    'Model Probabilities': self.prob,
                    'Timestamp': str(datetime.today()),
                    'Bayes Factors (Sampling Ratio)': self.Exp_ratio,
-                   'Model Probability confidence intervals':self.prob_conf}
+                   'Model Probability confidence intervals':self.prob_conf,
+                   'Unbiased Probabilities': self.unbiased_prob}
         if self.BF_BAR is not None:
             results['Bayes Factors (BAR)'] = self.BF_BAR
 
